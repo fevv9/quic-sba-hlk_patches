@@ -1,0 +1,292 @@
+From 442d568e8e7545656bc626e9135c3f8259104bee Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 28 Mar 2013 20:45:40 -0500
+Subject: [PATCH 25/32] Hexagon: update copyright dates
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/atomic.h     |    2 +-
+ arch/hexagon/include/asm/elf.h        |    2 +-
+ arch/hexagon/include/asm/hexagon_vm.h |    2 +-
+ arch/hexagon/include/asm/io.h         |    2 +-
+ arch/hexagon/include/asm/mem-layout.h |    2 +-
+ arch/hexagon/include/asm/page.h       |    2 +-
+ arch/hexagon/include/asm/processor.h  |    2 +-
+ arch/hexagon/include/asm/vm_mmu.h     |    2 +-
+ arch/hexagon/kernel/asm-offsets.c     |    2 +-
+ arch/hexagon/kernel/head.S            |    2 +-
+ arch/hexagon/kernel/kgdb.c            |    2 +-
+ arch/hexagon/kernel/ptrace.c          |    2 +-
+ arch/hexagon/kernel/setup.c           |    2 +-
+ arch/hexagon/kernel/signal.c          |    2 +-
+ arch/hexagon/kernel/traps.c           |    2 +-
+ arch/hexagon/kernel/vm_entry.S        |    2 +-
+ arch/hexagon/kernel/vm_events.c       |    2 +-
+ arch/hexagon/kernel/vm_vectors.S      |    2 +-
+ arch/hexagon/kernel/vmlinux.lds.S     |    2 +-
+ arch/hexagon/mm/init.c                |    2 +-
+ 20 files changed, 20 insertions(+), 20 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/atomic.h b/arch/hexagon/include/asm/atomic.h
+index c667039..8a64ff2 100644
+--- a/arch/hexagon/include/asm/atomic.h
++++ b/arch/hexagon/include/asm/atomic.h
+@@ -1,7 +1,7 @@
+ /*
+  * Atomic operations for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  *
+  * This program is free software; you can redistribute it and/or modify
+diff --git a/arch/hexagon/include/asm/elf.h b/arch/hexagon/include/asm/elf.h
+index 83b8d0e..f52d8ec 100644
+--- a/arch/hexagon/include/asm/elf.h
++++ b/arch/hexagon/include/asm/elf.h
+@@ -1,7 +1,7 @@
+ /*
+  * ELF definitions for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/include/asm/hexagon_vm.h b/arch/hexagon/include/asm/hexagon_vm.h
+index 2d84cef..67bb6d6 100644
+--- a/arch/hexagon/include/asm/hexagon_vm.h
++++ b/arch/hexagon/include/asm/hexagon_vm.h
+@@ -1,7 +1,7 @@
+ /*
+  * Declarations for to Hexagon Virtal Machine.
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
+index 6199ed5..1b7698e 100644
+--- a/arch/hexagon/include/asm/io.h
++++ b/arch/hexagon/include/asm/io.h
+@@ -1,7 +1,7 @@
+ /*
+  * IO definitions for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/include/asm/mem-layout.h b/arch/hexagon/include/asm/mem-layout.h
+index 3724cea..2cb7a70 100644
+--- a/arch/hexagon/include/asm/mem-layout.h
++++ b/arch/hexagon/include/asm/mem-layout.h
+@@ -1,7 +1,7 @@
+ /*
+  * Memory layout definitions for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/include/asm/page.h b/arch/hexagon/include/asm/page.h
+index de1b287..f3b26f1 100644
+--- a/arch/hexagon/include/asm/page.h
++++ b/arch/hexagon/include/asm/page.h
+@@ -1,7 +1,7 @@
+ /*
+  * Page management definitions for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/include/asm/processor.h b/arch/hexagon/include/asm/processor.h
+index 758bcd1..45a8254 100644
+--- a/arch/hexagon/include/asm/processor.h
++++ b/arch/hexagon/include/asm/processor.h
+@@ -1,7 +1,7 @@
+ /*
+  * Process/processor support for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/include/asm/vm_mmu.h b/arch/hexagon/include/asm/vm_mmu.h
+index e67b573..096537d 100644
+--- a/arch/hexagon/include/asm/vm_mmu.h
++++ b/arch/hexagon/include/asm/vm_mmu.h
+@@ -1,7 +1,7 @@
+ /*
+  * Hexagon VM page table entry definitions
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2013 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/asm-offsets.c b/arch/hexagon/kernel/asm-offsets.c
+index 181515b..308be68 100644
+--- a/arch/hexagon/kernel/asm-offsets.c
++++ b/arch/hexagon/kernel/asm-offsets.c
+@@ -5,7 +5,7 @@
+  * Kevin Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
+  * Copyright (C) 2000 MIPS Technologies, Inc.
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/head.S b/arch/hexagon/kernel/head.S
+index 8e88d24..b9b63d0 100644
+--- a/arch/hexagon/kernel/head.S
++++ b/arch/hexagon/kernel/head.S
+@@ -1,7 +1,7 @@
+ /*
+  * Early kernel startup code for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  *
+  * This program is free software; you can redistribute it and/or modify
+diff --git a/arch/hexagon/kernel/kgdb.c b/arch/hexagon/kernel/kgdb.c
+index 19f9e6c..82d5c25 100644
+--- a/arch/hexagon/kernel/kgdb.c
++++ b/arch/hexagon/kernel/kgdb.c
+@@ -1,7 +1,7 @@
+ /*
+  * arch/hexagon/kernel/kgdb.c - Hexagon KGDB Support
+  *
+- * Copyright (c) 2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/ptrace.c b/arch/hexagon/kernel/ptrace.c
+index 70df50d..de829eb 100644
+--- a/arch/hexagon/kernel/ptrace.c
++++ b/arch/hexagon/kernel/ptrace.c
+@@ -1,7 +1,7 @@
+ /*
+  * Ptrace support for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index d2dcb6b..bfe1331 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -1,7 +1,7 @@
+ /*
+  * Arch related setup for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/signal.c b/arch/hexagon/kernel/signal.c
+index 097623c..d7c7387 100644
+--- a/arch/hexagon/kernel/signal.c
++++ b/arch/hexagon/kernel/signal.c
+@@ -1,7 +1,7 @@
+ /*
+  * Signal support for Hexagon processor
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/traps.c b/arch/hexagon/kernel/traps.c
+index c2eeeef..aaf53f8 100644
+--- a/arch/hexagon/kernel/traps.c
++++ b/arch/hexagon/kernel/traps.c
+@@ -1,7 +1,7 @@
+ /*
+  * Kernel traps/events for Hexagon processor
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/vm_entry.S b/arch/hexagon/kernel/vm_entry.S
+index 3447091..e308618 100644
+--- a/arch/hexagon/kernel/vm_entry.S
++++ b/arch/hexagon/kernel/vm_entry.S
+@@ -1,7 +1,7 @@
+ /*
+  * Event entry/exit for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/vm_events.c b/arch/hexagon/kernel/vm_events.c
+index 5b81bac..3e44530 100644
+--- a/arch/hexagon/kernel/vm_events.c
++++ b/arch/hexagon/kernel/vm_events.c
+@@ -1,7 +1,7 @@
+ /*
+  * Mostly IRQ support for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/vm_vectors.S b/arch/hexagon/kernel/vm_vectors.S
+index aff4054..791a742 100644
+--- a/arch/hexagon/kernel/vm_vectors.S
++++ b/arch/hexagon/kernel/vm_vectors.S
+@@ -1,7 +1,7 @@
+ /*
+  * Event jump tables
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012,2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/kernel/vmlinux.lds.S b/arch/hexagon/kernel/vmlinux.lds.S
+index fafb886..44d8c47 100644
+--- a/arch/hexagon/kernel/vmlinux.lds.S
++++ b/arch/hexagon/kernel/vmlinux.lds.S
+@@ -1,7 +1,7 @@
+ /*
+  * Linker script for Hexagon kernel
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/hexagon/mm/init.c b/arch/hexagon/mm/init.c
+index 8e803a6..2561d25 100644
+--- a/arch/hexagon/mm/init.c
++++ b/arch/hexagon/mm/init.c
+@@ -1,7 +1,7 @@
+ /*
+  * Memory subsystem initialization for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+-- 
+1.7.9.5
+

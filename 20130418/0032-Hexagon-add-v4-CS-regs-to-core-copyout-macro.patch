@@ -1,0 +1,50 @@
+From e0e34dea9c018aca695a54ae51a963ac15219a91 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 9 Apr 2013 17:06:08 -0500
+Subject: [PATCH 32/32] Hexagon: add v4 CS regs to core copyout macro
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/elf.h |   15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/elf.h b/arch/hexagon/include/asm/elf.h
+index f52d8ec..e1b933a 100644
+--- a/arch/hexagon/include/asm/elf.h
++++ b/arch/hexagon/include/asm/elf.h
+@@ -104,6 +104,16 @@ typedef unsigned long elf_fpregset_t;
+  * Bypass the whole "regsets" thing for now and use the define.
+  */
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION >= 4
++#define CS_COPYREGS(DEST,REGS) \
++do {\
++	DEST.cs0 = REGS->cs0;\
++	DEST.cs1 = REGS->cs1;\
++} while (0)
++#else
++#define CS_COPYREGS(DEST,REGS)
++#endif
++
+ #define ELF_CORE_COPY_REGS(DEST, REGS)	\
+ do {					\
+ 	DEST.r0 = REGS->r00;		\
+@@ -148,13 +158,12 @@ do {					\
+ 	DEST.p3_0 = REGS->preds;	\
+ 	DEST.gp = REGS->gp;		\
+ 	DEST.ugp = REGS->ugp;		\
+-	DEST.pc = pt_elr(REGS);	\
++	CS_COPYREGS(DEST,REGS);		\
++	DEST.pc = pt_elr(REGS);		\
+ 	DEST.cause = pt_cause(REGS);	\
+ 	DEST.badva = pt_badva(REGS);	\
+ } while (0);
+ 
+-
+-
+ /*
+  * This is used to ensure we don't load something for the wrong architecture.
+  * Checks the machine and ABI type.
+-- 
+1.7.9.5
+

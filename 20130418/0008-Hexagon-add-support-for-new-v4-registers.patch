@@ -1,0 +1,463 @@
+From 97f393fe1fff0acb77410fbdb3064f4c2352d777 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 27 Mar 2012 17:38:09 -0500
+Subject: [PATCH 08/32] Hexagon: add support for new v4+ registers
+
+Add support for a couple new v4+ registers, along with
+newer save/restore pt_regs.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/uapi/asm/registers.h |   11 +-
+ arch/hexagon/include/uapi/asm/user.h      |    6 +
+ arch/hexagon/kernel/asm-offsets.c         |    3 +-
+ arch/hexagon/kernel/kgdb.c                |    2 +
+ arch/hexagon/kernel/ptrace.c              |    9 ++
+ arch/hexagon/kernel/signal.c              |   10 +-
+ arch/hexagon/kernel/vm_entry.S            |  211 +++++++++++++++++++++++------
+ arch/hexagon/kernel/vm_events.c           |    2 +
+ 8 files changed, 206 insertions(+), 48 deletions(-)
+
+diff --git a/arch/hexagon/include/uapi/asm/registers.h b/arch/hexagon/include/uapi/asm/registers.h
+index c20406f..8050415 100644
+--- a/arch/hexagon/include/uapi/asm/registers.h
++++ b/arch/hexagon/include/uapi/asm/registers.h
+@@ -57,10 +57,17 @@ struct pt_regs {
+ 	};
+ 	union {
+ 		struct {
+-			unsigned long gp;
+ 			unsigned long ugp;
++			unsigned long gp;
++		};
++		long long int gpugp;
++	};
++	union {
++		struct {
++			unsigned long cs0;
++			unsigned long cs1;
+ 		};
+-		long long int ugpgp;
++		long long int cs1cs0;
+ 	};
+ 	/*
+ 	* Be extremely careful with rearranging these, if at all.  Some code
+diff --git a/arch/hexagon/include/uapi/asm/user.h b/arch/hexagon/include/uapi/asm/user.h
+index cef13ee..3dae94d 100644
+--- a/arch/hexagon/include/uapi/asm/user.h
++++ b/arch/hexagon/include/uapi/asm/user.h
+@@ -55,9 +55,15 @@ struct user_regs_struct {
+ 	unsigned long pc;
+ 	unsigned long cause;
+ 	unsigned long badva;
++#if CONFIG_HEXAGON_ARCH_VERSION < 4
+ 	unsigned long pad1;  /* pad out to 48 words total */
+ 	unsigned long pad2;  /* pad out to 48 words total */
+ 	unsigned long pad3;  /* pad out to 48 words total */
++#else
++	unsigned long cs0;
++	unsigned long cs1;
++	unsigned long pad1;  /* pad out to 48 words total */
++#endif
+ };
+ 
+ #endif
+diff --git a/arch/hexagon/kernel/asm-offsets.c b/arch/hexagon/kernel/asm-offsets.c
+index 2d5e84d..181515b 100644
+--- a/arch/hexagon/kernel/asm-offsets.c
++++ b/arch/hexagon/kernel/asm-offsets.c
+@@ -44,7 +44,8 @@ int main(void)
+ 
+ 	COMMENT("Hexagon pt_regs definitions");
+ 	OFFSET(_PT_SYSCALL_NR, pt_regs, syscall_nr);
+-	OFFSET(_PT_UGPGP, pt_regs, ugpgp);
++	OFFSET(_PT_GPUGP, pt_regs, gpugp);
++	OFFSET(_PT_CS1CS0, pt_regs, cs1cs0);
+ 	OFFSET(_PT_R3130, pt_regs, r3130);
+ 	OFFSET(_PT_R2928, pt_regs, r2928);
+ 	OFFSET(_PT_R2726, pt_regs, r2726);
+diff --git a/arch/hexagon/kernel/kgdb.c b/arch/hexagon/kernel/kgdb.c
+index 3446453..19f9e6c 100644
+--- a/arch/hexagon/kernel/kgdb.c
++++ b/arch/hexagon/kernel/kgdb.c
+@@ -70,6 +70,8 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+ 	{ "lc1", GDB_SIZEOF_REG, offsetof(struct pt_regs, lc1)},
+ 	{ " gp", GDB_SIZEOF_REG, offsetof(struct pt_regs, gp)},
+ 	{ "ugp", GDB_SIZEOF_REG, offsetof(struct pt_regs, ugp)},
++	{ "cs0", GDB_SIZEOF_REG, offsetof(struct pt_regs, cs0)},
++	{ "cs1", GDB_SIZEOF_REG, offsetof(struct pt_regs, cs1)},
+ 	{ "psp", GDB_SIZEOF_REG, offsetof(struct pt_regs, hvmer.vmpsp)},
+ 	{ "elr", GDB_SIZEOF_REG, offsetof(struct pt_regs, hvmer.vmel)},
+ 	{ "est", GDB_SIZEOF_REG, offsetof(struct pt_regs, hvmer.vmest)},
+diff --git a/arch/hexagon/kernel/ptrace.c b/arch/hexagon/kernel/ptrace.c
+index 670b1b0..3982d9c 100644
+--- a/arch/hexagon/kernel/ptrace.c
++++ b/arch/hexagon/kernel/ptrace.c
+@@ -76,6 +76,10 @@ static int genregs_get(struct task_struct *target,
+ 	dummy = pt_cause(regs);
+ 	ONEXT(&dummy, cause);
+ 	ONEXT(&pt_badva(regs), badva);
++#if CONFIG_HEXAGON_ARCH_VERSION >=4
++	ONEXT(&regs->cs0, cs0);
++	ONEXT(&regs->cs1, cs1);
++#endif
+ 
+ 	/* Pad the rest with zeros, if needed */
+ 	if (!ret)
+@@ -123,6 +127,11 @@ static int genregs_set(struct task_struct *target,
+ 	INEXT(&bucket, cause);
+ 	INEXT(&bucket, badva);
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION >=4
++	INEXT(&regs->cs0, cs0);
++	INEXT(&regs->cs1, cs1);
++#endif
++
+ 	/* Ignore the rest, if needed */
+ 	if (!ret)
+ 		ret = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
+diff --git a/arch/hexagon/kernel/signal.c b/arch/hexagon/kernel/signal.c
+index 60fa2ca..a1492a6 100644
+--- a/arch/hexagon/kernel/signal.c
++++ b/arch/hexagon/kernel/signal.c
+@@ -66,7 +66,10 @@ static int setup_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
+ 	err |= __put_user(regs->preds, &sc->sc_regs.p3_0);
+ 	err |= __put_user(regs->gp, &sc->sc_regs.gp);
+ 	err |= __put_user(regs->ugp, &sc->sc_regs.ugp);
+-
++#if CONFIG_HEXAGON_ARCH_VERSION >= 4
++	err |= __put_user(regs->cs0, &sc->sc_regs.cs0);
++	err |= __put_user(regs->cs1, &sc->sc_regs.cs1);
++#endif
+ 	tmp = pt_elr(regs); err |= __put_user(tmp, &sc->sc_regs.pc);
+ 	tmp = pt_cause(regs); err |= __put_user(tmp, &sc->sc_regs.cause);
+ 	tmp = pt_badva(regs); err |= __put_user(tmp, &sc->sc_regs.badva);
+@@ -93,7 +96,10 @@ static int restore_sigcontext(struct pt_regs *regs,
+ 	err |= __get_user(regs->preds, &sc->sc_regs.p3_0);
+ 	err |= __get_user(regs->gp, &sc->sc_regs.gp);
+ 	err |= __get_user(regs->ugp, &sc->sc_regs.ugp);
+-
++#if CONFIG_HEXAGON_ARCH_VERSION >= 4
++	err |= __get_user(regs->cs0, &sc->sc_regs.cs0);
++	err |= __get_user(regs->cs1, &sc->sc_regs.cs1);
++#endif
+ 	err |= __get_user(tmp, &sc->sc_regs.pc); pt_set_elr(regs, tmp);
+ 
+ 	return err;
+diff --git a/arch/hexagon/kernel/vm_entry.S b/arch/hexagon/kernel/vm_entry.S
+index 425e50c..ffe4a42 100644
+--- a/arch/hexagon/kernel/vm_entry.S
++++ b/arch/hexagon/kernel/vm_entry.S
+@@ -45,48 +45,88 @@
+  * number in the case where we decode a system call (trap0(#1)).
+  */
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION < 4
+ #define save_pt_regs()\
+-	memd(R0 + #_PT_R3130) = R31:30; \
++ memd(R0 + #_PT_R3130) = R31:30; \
++ { memw(R0 + #_PT_R2928) = R28; \
++   R31 = memw(R0 + #_PT_ER_VMPSP); }\
++ { memw(R0 + #(_PT_R2928 + 4)) = R31; \
++   R31 = ugp; } \
++ { memd(R0 + #_PT_R2726) = R27:26; \
++   R30 = gp ; } \
++ memd(R0 + #_PT_R2524) = R25:24; \
++ memd(R0 + #_PT_R2322) = R23:22; \
++ memd(R0 + #_PT_R2120) = R21:20; \
++ memd(R0 + #_PT_R1918) = R19:18; \
++ memd(R0 + #_PT_R1716) = R17:16; \
++ memd(R0 + #_PT_R1514) = R15:14; \
++ memd(R0 + #_PT_R1312) = R13:12; \
++ { memd(R0 + #_PT_R1110) = R11:10; \
++   R15 = lc0; } \
++ { memd(R0 + #_PT_R0908) = R9:8; \
++   R14 = sa0; } \
++ { memd(R0 + #_PT_R0706) = R7:6; \
++   R13 = lc1; } \
++ { memd(R0 + #_PT_R0504) = R5:4; \
++   R12 = sa1; } \
++ { memd(R0 + #_PT_GPUGP) = R31:30; \
++   R11 = m1; \
++   R2.H = #HI(_THREAD_SIZE); } \
++ { memd(R0 + #_PT_LC0SA0) = R15:14; \
++   R10 = m0; \
++   R2.L = #LO(_THREAD_SIZE); } \
++ { memd(R0 + #_PT_LC1SA1) = R13:12; \
++   R15 = p3:0; \
++   R2 = neg(R2); } \
++ { memd(R0 + #_PT_M1M0) = R11:10; \
++   R14  = usr; \
++   R2 = and(R0,R2); } \
++ { memd(R0 + #_PT_PREDSUSR) =  R15:14; \
++   THREADINFO_REG = R2; } \
++ { r24 = memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS); \
++   memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS) = R0; \
++   R2 = #-1; } \
++ { memw(R0 + #_PT_SYSCALL_NR) = R2; \
++   R30 = #0; }
++#else
++/* V4+ */
++/* the # ## # syntax inserts a literal ## */
++#define save_pt_regs()\
++	{ memd(R0 + #_PT_R3130) = R31:30; \
++		R30 = memw(R0 + #_PT_ER_VMPSP); }\
+ 	{ memw(R0 + #_PT_R2928) = R28; \
+-	  R31 = memw(R0 + #_PT_ER_VMPSP); }\
+-	{ memw(R0 + #(_PT_R2928 + 4)) = R31; \
+-	  R31 = ugp; } \
+-	{ memd(R0 + #_PT_R2726) = R27:26; \
+-	  R30 = gp ; } \
+-	memd(R0 + #_PT_R2524) = R25:24; \
+-	memd(R0 + #_PT_R2322) = R23:22; \
+-	memd(R0 + #_PT_R2120) = R21:20; \
+-	memd(R0 + #_PT_R1918) = R19:18; \
+-	memd(R0 + #_PT_R1716) = R17:16; \
+-	memd(R0 + #_PT_R1514) = R15:14; \
+-	memd(R0 + #_PT_R1312) = R13:12; \
++		memw(R0 + #(_PT_R2928 + 4)) = R30; }\
++	{ R31:30 = C11:10; \
++		memd(R0 + #_PT_R2726) = R27:26; \
++		memd(R0 + #_PT_R2524) = R25:24; }\
++	{ memd(R0 + #_PT_R2322) = R23:22; \
++		memd(R0 + #_PT_R2120) = R21:20; }\
++	{ memd(R0 + #_PT_R1918) = R19:18; \
++		memd(R0 + #_PT_R1716) = R17:16; }\
++	{ memd(R0 + #_PT_R1514) = R15:14; \
++		memd(R0 + #_PT_R1312) = R13:12; \
++		R17:16 = C13:12; }\
+ 	{ memd(R0 + #_PT_R1110) = R11:10; \
+-	  R15 = lc0; } \
+-	{ memd(R0 + #_PT_R0908) = R9:8; \
+-	  R14 = sa0; } \
++		memd(R0 + #_PT_R0908) = R9:8; \
++	  R15:14 = C1:0; } \
+ 	{ memd(R0 + #_PT_R0706) = R7:6; \
+-	  R13 = lc1; } \
+-	{ memd(R0 + #_PT_R0504) = R5:4; \
+-	  R12 = sa1; } \
+-	{ memd(R0 + #_PT_UGPGP) = R31:30; \
+-	  R11 = m1; \
+-	  R2.H = #HI(_THREAD_SIZE); } \
+-	{ memd(R0 + #_PT_LC0SA0) = R15:14; \
+-	  R10 = m0; \
+-	  R2.L = #LO(_THREAD_SIZE); } \
+-	{ memd(R0 + #_PT_LC1SA1) = R13:12; \
+-	  R15 = p3:0; \
+-	  R2 = neg(R2); } \
++		memd(R0 + #_PT_R0504) = R5:4; \
++    R13:12 = C3:2; } \
++	{ memd(R0 + #_PT_GPUGP) = R31:30; \
++		memd(R0 + #_PT_LC0SA0) = R15:14; \
++	  R11:10 = C7:6; }\
++	{	THREADINFO_REG = and(R0, # ## #-_THREAD_SIZE); \
++		memd(R0 + #_PT_LC1SA1) = R13:12; \
++	  R15 = p3:0; }\
+ 	{ memd(R0 + #_PT_M1M0) = R11:10; \
+-	  R14  = usr; \
+-	  R2 = and(R0,R2); } \
+-	{ memd(R0 + #_PT_PREDSUSR) =  R15:14; \
+-	  THREADINFO_REG = R2; } \
++		memw(R0 + #_PT_PREDSUSR + 4) =  R15; }\
+ 	{ r24 = memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS); \
+ 	  memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS) = R0; \
+ 	  R2 = #-1; } \
+ 	{ memw(R0 + #_PT_SYSCALL_NR) = R2; \
++		memd(R0 + #_PT_CS1CS0) = R17:16; \
+ 	  R30 = #0; }
++#endif
+ 
+ /*
+  * Restore registers and thread_info.regs state. THREADINFO_REG
+@@ -94,6 +134,7 @@
+  * preserved. Don't restore R29 (SP) until later.
+  */
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION < 4
+ #define restore_pt_regs() \
+ 	{ memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS) = R24; \
+ 	  R15:14 = memd(R0 + #_PT_PREDSUSR); } \
+@@ -121,11 +162,44 @@
+ 	  R23:22 = memd(R0 + #_PT_R2322); } \
+ 	{ R25:24 = memd(R0 + #_PT_R2524); \
+ 	  R27:26 = memd(R0 + #_PT_R2726); } \
+-	R31:30 = memd(R0 + #_PT_UGPGP); \
++	R31:30 = memd(R0 + #_PT_GPUGP); \
+ 	{ R28 = memw(R0 + #_PT_R2928); \
+ 	  ugp = R31; } \
+ 	{ R31:30 = memd(R0 + #_PT_R3130); \
+ 	  gp = R30; }
++#else
++/* V4+ */
++#define restore_pt_regs() \
++	{ memw(THREADINFO_REG + #_THREAD_INFO_PT_REGS) = R24; \
++	  R15:14 = memd(R0 + #_PT_PREDSUSR); } \
++	{ R11:10 = memd(R0 + #_PT_M1M0); \
++		R13:12 = memd(R0 + #_PT_LC1SA1); \
++		p3:0 = R15; } \
++	{ R15:14 = memd(R0 + #_PT_LC0SA0); \
++		R3:2 = memd(R0 + #_PT_R0302); \
++		usr = R14; } \
++	{ R5:4 = memd(R0 + #_PT_R0504); \
++		R7:6 = memd(R0 + #_PT_R0706); \
++		C7:6 = R11:10; }\
++	{ R9:8 = memd(R0 + #_PT_R0908); \
++		R11:10 = memd(R0 + #_PT_R1110); \
++    C3:2 = R13:12; }\
++	{ R13:12 = memd(R0 + #_PT_R1312); \
++	  R15:14 = memd(R0 + #_PT_R1514); \
++		C1:0 = R15:14; }\
++	{ R17:16 = memd(R0 + #_PT_R1716); \
++	  R19:18 = memd(R0 + #_PT_R1918); } \
++	{ R21:20 = memd(R0 + #_PT_R2120); \
++	  R23:22 = memd(R0 + #_PT_R2322); } \
++	{ R25:24 = memd(R0 + #_PT_R2524); \
++	  R27:26 = memd(R0 + #_PT_R2726); } \
++	R31:30 = memd(R0 + #_PT_CS1CS0); \
++	{ C13:12 = R31:30; \
++		R31:30 = memd(R0 + #_PT_GPUGP) ; \
++		R28 = memw(R0 + #_PT_R2928); }\
++	{ C11:10 = R31:30; \
++		R31:30 = memd(R0 + #_PT_R3130); }
++#endif
+ 
+ 	/*
+ 	 * Clears off enough space for the rest of pt_regs; evrec is a part
+@@ -139,6 +213,7 @@
+  * Need to save off R0, R1, R2, R3 immediately.
+  */
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION < 4
+ #define	vm_event_entry(CHandler) \
+ 	{ \
+ 		R29 = add(R29, #-(_PT_REGS_SIZE)); \
+@@ -158,6 +233,34 @@
+ 		R1.H = #HI(CHandler); \
+ 		jump event_dispatch; \
+ 	}
++#else
++/* V4+ */
++/* turn on I$ prefetch early */
++/* the # ## # syntax inserts a literal ## */
++#define	vm_event_entry(CHandler) \
++	{ \
++		R29 = add(R29, #-(_PT_REGS_SIZE)); \
++		memd(R29 + #(_PT_R0100 + -_PT_REGS_SIZE)) = R1:0; \
++		memd(R29 + #(_PT_R0302 + -_PT_REGS_SIZE)) = R3:2; \
++		R0 = usr; \
++	} \
++	{ \
++		memw(R29 + #_PT_PREDSUSR) = R0; \
++		R0 = setbit(R0, #16); \
++	} \
++	usr = R0; \
++	R1:0 = G1:0; \
++	{ \
++		memd(R29 + #_PT_ER_VMEL) = R1:0; \
++		R1 = # ## #(CHandler); \
++		R3:2 = G3:2; \
++	} \
++	{ \
++		R0 = R29; \
++		memd(R29 + #_PT_ER_VMPSP) = R3:2; \
++		jump event_dispatch; \
++	}
++#endif
+ 
+ .text
+ 	/*
+@@ -184,8 +287,10 @@ event_dispatch:
+ 
+ 	/*  "Nested control path" -- if the previous mode was kernel  */
+ 	R0 = memw(R29 + #_PT_ER_VMEST);
+-	P0 = tstbit(R0, #HVM_VMEST_UM_SFT);
+-	if !P0 jump restore_all;
++	{
++		P0 = tstbit(R0, #HVM_VMEST_UM_SFT);
++		if (!P0.new) jump:nt restore_all;
++	}
+ 	/*
+ 	 * Returning from system call, normally coming back from user mode
+ 	 */
+@@ -198,11 +303,18 @@ return_from_syscall:
+ 	 * Coming back from the C-world, our thread info pointer
+ 	 * should be in the designated register (usually R19)
+ 	 */
++#if CONFIG_HEXAGON_ARCH_VERSION < 4
+ 	R1.L = #LO(_TIF_ALLWORK_MASK)
+ 	{
+ 		R1.H = #HI(_TIF_ALLWORK_MASK);
+ 		R0 = memw(THREADINFO_REG + #_THREAD_INFO_FLAGS);
+ 	}
++#else
++	{
++		R1 = ##_TIF_ALLWORK_MASK;
++		R0 = memw(THREADINFO_REG + #_THREAD_INFO_FLAGS);
++	}
++#endif
+ 
+ 	/*
+ 	 * Compare against the "return to userspace" _TIF_WORK_MASK
+@@ -222,10 +334,14 @@ work_pending:
+ work_notifysig:
+ 	/*  this is the part that's kind of fuzzy.  */
+ 	R1 = and(R0, #(_TIF_SIGPENDING | _TIF_NOTIFY_RESUME));
+-	P0 = cmp.eq(R1, #0);
+-	if P0 jump restore_all
+-	R1 = R0; 	/* unsigned long thread_info_flags */
+-	R0 = R29;	/* regs should still be at top of stack  */
++	{
++		P0 = cmp.eq(R1, #0);
++		if P0.new jump:t restore_all;
++	}
++	{
++		R1 = R0; 	/* unsigned long thread_info_flags */
++		R0 = R29;	/* regs should still be at top of stack  */
++	}
+ 	call do_notify_resume
+ 
+ restore_all:
+@@ -235,14 +351,23 @@ restore_all:
+ 
+ 	/*  do the setregs here for VM 0.5  */
+ 	/*  R29 here should already be pointing at pt_regs  */
+-	R1:0 = memd(R29 + #_PT_ER_VMEL);
+-	R3:2 = memd(R29 + #_PT_ER_VMPSP);
++	{
++		R1:0 = memd(R29 + #_PT_ER_VMEL);
++		R3:2 = memd(R29 + #_PT_ER_VMPSP);
++	}
++#if CONFIG_HEXAGON_ARCH_VERSION < 4
+ 	trap1(#HVM_TRAP1_VMSETREGS);
++#else
++	G1:0 = R1:0;
++	G3:2 = R3:2;
++#endif
+ 
+ 	R0 = R29
+ 	restore_pt_regs()
+-	R1:0 = memd(R29 + #_PT_R0100);
+-	R29 = add(R29, #_PT_REGS_SIZE);
++	{
++		R1:0 = memd(R29 + #_PT_R0100);
++		R29 = add(R29, #_PT_REGS_SIZE);
++	}
+ 	trap1(#HVM_TRAP1_VMRTE)
+ 	/* Notreached */
+ 
+diff --git a/arch/hexagon/kernel/vm_events.c b/arch/hexagon/kernel/vm_events.c
+index 9b5a4a2..5b81bac 100644
+--- a/arch/hexagon/kernel/vm_events.c
++++ b/arch/hexagon/kernel/vm_events.c
+@@ -42,6 +42,8 @@ void show_regs(struct pt_regs *regs)
+ 	       regs->lc1, regs->sa1, regs->m1);
+ 	printk(KERN_EMERG "gp: \t0x%08lx   ugp: 0x%08lx   usr: 0x%08lx\n",
+ 	       regs->gp, regs->ugp, regs->usr);
++	printk(KERN_EMERG "cs0: \t0x%08lx   cs1: 0x%08lx\n",
++	       regs->cs0, regs->cs1);
+ 	printk(KERN_EMERG "r0: \t0x%08lx %08lx %08lx %08lx\n", regs->r00,
+ 		regs->r01,
+ 		regs->r02,
+-- 
+1.7.9.5
+

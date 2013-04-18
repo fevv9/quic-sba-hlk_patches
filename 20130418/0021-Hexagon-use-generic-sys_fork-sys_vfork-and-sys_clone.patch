@@ -1,0 +1,42 @@
+From 7a01b0396892e2ee7d58d81604c6a84120ff9cb8 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 19 Feb 2013 19:19:50 -0600
+Subject: [PATCH 21/32] Hexagon: use generic sys_fork, sys_vfork, and
+ sys_clone
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig                   |    2 ++
+ arch/hexagon/include/uapi/asm/unistd.h |    3 +++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index b059d8c..9b94b0f 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -30,6 +30,8 @@ config HEXAGON
+ 	select GENERIC_CLOCKEVENTS_BROADCAST
+ 	select MODULES_USE_ELF_RELA
+ 	select GENERIC_CPU_DEVICES
++	select GENERIC_KERNEL_THREAD
++	select GENERIC_KERNEL_EXECVE
+ 	---help---
+ 	  Qualcomm Hexagon is a processor architecture designed for high
+ 	  performance and low power across a wide variety of applications.
+diff --git a/arch/hexagon/include/uapi/asm/unistd.h b/arch/hexagon/include/uapi/asm/unistd.h
+index 4a87cc4..ffee405 100644
+--- a/arch/hexagon/include/uapi/asm/unistd.h
++++ b/arch/hexagon/include/uapi/asm/unistd.h
+@@ -27,6 +27,9 @@
+  */
+ 
+ #define sys_mmap2 sys_mmap_pgoff
++#define __ARCH_WANT_SYS_EXECVE
+ #define __ARCH_WANT_SYS_CLONE
++#define __ARCH_WANT_SYS_VFORK
++#define __ARCH_WANT_SYS_FORK
+ 
+ #include <asm-generic/unistd.h>
+-- 
+1.7.9.5
+

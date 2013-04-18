@@ -1,0 +1,26 @@
+From dbae7c0b183388b0493f72428792ff12ad6f0a12 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 8 Apr 2013 18:26:25 -0500
+Subject: [PATCH 29/32] Hexagon: fix return value for notify_resume case in
+ do_work_pending
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/process.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/hexagon/kernel/process.c b/arch/hexagon/kernel/process.c
+index a91b290..7fcc636 100644
+--- a/arch/hexagon/kernel/process.c
++++ b/arch/hexagon/kernel/process.c
+@@ -235,6 +235,7 @@ int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
+ 	if (thread_info_flags & _TIF_NOTIFY_RESUME) {
+ 		clear_thread_flag(TIF_NOTIFY_RESUME);
+ 		tracehook_notify_resume(regs);
++		return 1;
+ 	}
+ 
+ 	/* Should not even reach here */
+-- 
+1.7.9.5
+

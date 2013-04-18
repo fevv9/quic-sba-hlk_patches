@@ -1,0 +1,47 @@
+From 411d53d55792caf2ca6e6fd59442904f43ab102a Mon Sep 17 00:00:00 2001
+From: Paul Bolle <pebolle@tiscali.nl>
+Date: Thu, 21 Mar 2013 11:13:17 +0100
+Subject: [PATCH 27/32] Hexagon: remove two Kconfig entries
+
+The Kconfig entries for HEXAGON_VM and HEXAGON_ANGEL_TRAPS were added,
+together with the configuration and makefiles for the Hexagon
+architecture, in v3.2. They have never been used. They can safely be
+removed.
+
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+[rkuo@codeaurora.org: adjust for line changes in Kconfig]
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig |    9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index a0c0fb0..04dff5b 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -105,9 +105,6 @@ config HEXAGON_ARCH_VERSION
+ 	int "Architecture version"
+ 	default 2
+ 
+-config HEXAGON_VM
+-	def_bool y
+-
+ config CMDLINE
+ 	string "Default kernel command string"
+ 	default ""
+@@ -118,12 +115,6 @@ config CMDLINE
+ 	  minimum, you should specify the memory size and the root device
+ 	  (e.g., mem=64M root=/dev/nfs).
+ 
+-config HEXAGON_ANGEL_TRAPS
+-	bool "Use Angel Traps"
+-	default n
+-	---help---
+-	  Enable angel debug traps (for printk's).
+-
+ config SMP
+ 	bool "Multi-Processing support"
+ 	---help---
+-- 
+1.7.9.5
+

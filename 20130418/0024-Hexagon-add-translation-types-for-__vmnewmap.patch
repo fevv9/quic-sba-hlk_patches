@@ -1,0 +1,31 @@
+From c7a348e00b31631b424f31d2eecdbd195b117e1f Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 25 Mar 2013 21:57:36 -0500
+Subject: [PATCH 24/32] Hexagon: add translation types for __vmnewmap
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/hexagon_vm.h |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/hexagon/include/asm/hexagon_vm.h b/arch/hexagon/include/asm/hexagon_vm.h
+index 6b81e4d..2d84cef 100644
+--- a/arch/hexagon/include/asm/hexagon_vm.h
++++ b/arch/hexagon/include/asm/hexagon_vm.h
+@@ -197,6 +197,13 @@ static inline long __vmintop_clear(long i)
+  * Constants for virtual instruction parameters and return values
+  */
+ 
++/* vmnewmap arguments */
++
++#define VM_TRANS_TYPE_LINEAR 0
++#define VM_TRANS_TYPE_TABLE 1
++#define VM_TLB_INVALIDATE_FALSE 0
++#define VM_TLB_INVALIDATE_TRUE 1
++
+ /* vmsetie arguments */
+ 
+ #define VM_INT_DISABLE	0
+-- 
+1.7.9.5
+

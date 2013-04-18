@@ -1,0 +1,35 @@
+From 9dae9991de73aba14bfaab61534f292b781bc61e Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 8 Apr 2013 17:48:33 -0500
+Subject: [PATCH 28/32] Hexagon: fix signal number for user mem faults
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/mm/vm_fault.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/mm/vm_fault.c b/arch/hexagon/mm/vm_fault.c
+index 308ef0c..1bd276d 100644
+--- a/arch/hexagon/mm/vm_fault.c
++++ b/arch/hexagon/mm/vm_fault.c
+@@ -147,7 +147,7 @@ good_area:
+ 	}
+ 	info.si_errno = 0;
+ 	info.si_addr = (void __user *)address;
+-	force_sig_info(info.si_code, &info, current);
++	force_sig_info(info.si_signo, &info, current);
+ 	return;
+ 
+ bad_area:
+@@ -158,7 +158,7 @@ bad_area:
+ 		info.si_errno = 0;
+ 		info.si_code = si_code;
+ 		info.si_addr = (void *)address;
+-		force_sig_info(SIGSEGV, &info, current);
++		force_sig_info(info.si_signo, &info, current);
+ 		return;
+ 	}
+ 	/* Kernel-mode fault falls through */
+-- 
+1.7.9.5
+

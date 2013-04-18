@@ -1,0 +1,27 @@
+From 87be049e2feca933f0f5f185a146507b99e026e1 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Wed, 20 Jun 2012 16:06:26 -0500
+Subject: [PATCH 11/32] Hexagon: remove keyring related call
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/process.c |    3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/hexagon/kernel/process.c b/arch/hexagon/kernel/process.c
+index dc72ed5..9eb43b3ae 100644
+--- a/arch/hexagon/kernel/process.c
++++ b/arch/hexagon/kernel/process.c
+@@ -234,9 +234,6 @@ int do_work_pending(struct pt_regs *regs, u32 thread_info_flags)
+ 	if (thread_info_flags & _TIF_NOTIFY_RESUME) {
+ 		clear_thread_flag(TIF_NOTIFY_RESUME);
+ 		tracehook_notify_resume(regs);
+-		if (current->replacement_session_keyring)
+-			key_replace_session_keyring();
+-		return 1;
+ 	}
+ 
+ 	/* Should not even reach here */
+-- 
+1.7.9.5
+

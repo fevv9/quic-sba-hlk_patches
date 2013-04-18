@@ -1,0 +1,44 @@
+From 7aa385ff919215de801d4e27672641b89828286a Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 23 Oct 2012 18:26:01 -0500
+Subject: [PATCH 19/32] Hexagon: fix up int enable/disable at ret_from_fork
+
+Check return coming out of check_work_pending, and if copy_thread
+passed us a function in r24, call it.  Based on feedback from Al
+Viro.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/vm_entry.S |   13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/kernel/vm_entry.S b/arch/hexagon/kernel/vm_entry.S
+index 9add73a..3447091 100644
+--- a/arch/hexagon/kernel/vm_entry.S
++++ b/arch/hexagon/kernel/vm_entry.S
+@@ -374,11 +374,20 @@ _K_enter_debug:
+ 	.globl ret_from_fork
+ ret_from_fork:
+ 	{
+-		call schedule_tail;
++		call schedule_tail
+ 		R16.H = #HI(do_work_pending);
+ 	}
+ 	{
++		P0 = cmp.eq(R24, #0);
+ 		R16.L = #LO(do_work_pending);
+ 		R0 = #VM_INT_DISABLE;
+-		jump check_work_pending;
++	}
++	if P0 jump check_work_pending
++	{
++		R0 = R25;
++		callr R24
++	}
++	{
++		jump check_work_pending
++		R0 = #VM_INT_DISABLE;
+ 	}
+-- 
+1.7.9.5
+

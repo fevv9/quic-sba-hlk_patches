@@ -1,0 +1,30 @@
+From 7f341c4e052ede2849d127fb411d6be6ef0e2df0 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 25 Oct 2012 13:50:27 -0500
+Subject: [PATCH 20/32] Hexagon: fix psp/sp macro
+
+Based on feedback from Al Viro; previous-stack-pointer and
+user reg for same should always be kept consistent.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/uapi/asm/registers.h |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/include/uapi/asm/registers.h b/arch/hexagon/include/uapi/asm/registers.h
+index fcdb5f9..487d6ce 100644
+--- a/arch/hexagon/include/uapi/asm/registers.h
++++ b/arch/hexagon/include/uapi/asm/registers.h
+@@ -215,8 +215,7 @@ struct pt_regs {
+ #define pt_clr_singlestep(regs) ((regs)->hvmer.vmest &= ~(1<<HVM_VMEST_SS_SFT))
+ 
+ #define pt_set_rte_sp(regs, sp) do {\
+-	pt_psp(regs) = (sp);\
+-	(regs)->SP = (unsigned long) &((regs)->hvmer);\
++	pt_psp(regs) = (regs)->SP = (sp);\
+ 	} while (0)
+ 
+ #define pt_set_kmode(regs) \
+-- 
+1.7.9.5
+

@@ -1,0 +1,119 @@
+From 277958c0394f94a4343efb7d04d07c0280d8d37b Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 8 Apr 2013 18:30:12 -0500
+Subject: [PATCH 30/32] Hexagon: use correct translations for DMA mappings
+
+With physical offsets, pa<->va translations aren't just based
+on PAGE_OFFSET anymore.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/page.h |    5 +++++
+ arch/hexagon/kernel/dma.c       |   27 +++++++++++++++++----------
+ 2 files changed, 22 insertions(+), 10 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/page.h b/arch/hexagon/include/asm/page.h
+index f3b26f1..93f5669 100644
+--- a/arch/hexagon/include/asm/page.h
++++ b/arch/hexagon/include/asm/page.h
+@@ -140,6 +140,11 @@ static inline void clear_page(void *page)
+  */
+ #define page_to_phys(page)      (page_to_pfn(page) << PAGE_SHIFT)
+ 
++#define virt_to_pfn(kaddr)      (__pa(kaddr) >> PAGE_SHIFT)
++#define pfn_to_virt(pfn)        __va((pfn) << PAGE_SHIFT)
++
++#define page_to_virt(page)	__va(page_to_phys(page))
++
+ /*
+  * For port to Hexagon Virtual Machine, MAYBE we check for attempts
+  * to reference reserved HVM space, but in any case, the VM will be
+diff --git a/arch/hexagon/kernel/dma.c b/arch/hexagon/kernel/dma.c
+index 65c7bdc..b74f9ba 100644
+--- a/arch/hexagon/kernel/dma.c
++++ b/arch/hexagon/kernel/dma.c
+@@ -1,7 +1,7 @@
+ /*
+  * DMA implementation for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -23,12 +23,18 @@
+ #include <linux/genalloc.h>
+ #include <asm/dma-mapping.h>
+ #include <linux/module.h>
++#include <asm/page.h>
+ 
+ struct dma_map_ops *dma_ops;
+ EXPORT_SYMBOL(dma_ops);
+ 
+ int bad_dma_address;  /*  globals are automatically initialized to zero  */
+ 
++static inline void *dma_addr_to_virt(dma_addr_t dma_addr)
++{
++	return phys_to_virt((unsigned long) dma_addr);
++}
++
+ int dma_supported(struct device *dev, u64 mask)
+ {
+ 	if (mask == DMA_BIT_MASK(32))
+@@ -60,6 +66,12 @@ static void *hexagon_dma_alloc_coherent(struct device *dev, size_t size,
+ {
+ 	void *ret;
+ 
++	/*
++	 * Our max_low_pfn should have been backed off by 16MB in
++	 * mm/init.c to create DMA coherent space.  Use that as the VA
++	 * for the pool.
++	 */
++
+ 	if (coherent_pool == NULL) {
+ 		coherent_pool = gen_pool_create(PAGE_SHIFT, -1);
+ 
+@@ -67,7 +79,7 @@ static void *hexagon_dma_alloc_coherent(struct device *dev, size_t size,
+ 			panic("Can't create %s() memory pool!", __func__);
+ 		else
+ 			gen_pool_add(coherent_pool,
+-				(PAGE_OFFSET + (max_low_pfn << PAGE_SHIFT)),
++				pfn_to_virt(max_low_pfn),
+ 				hexagon_coherent_pool_size, -1);
+ 	}
+ 
+@@ -75,7 +87,7 @@ static void *hexagon_dma_alloc_coherent(struct device *dev, size_t size,
+ 
+ 	if (ret) {
+ 		memset(ret, 0, size);
+-		*dma_addr = (dma_addr_t) (ret - PAGE_OFFSET);
++		*dma_addr = (dma_addr_t) virt_to_phys(ret);
+ 	} else
+ 		*dma_addr = ~0;
+ 
+@@ -118,8 +130,8 @@ static int hexagon_map_sg(struct device *hwdev, struct scatterlist *sg,
+ 
+ 		s->dma_length = s->length;
+ 
+-		flush_dcache_range(PAGE_OFFSET + s->dma_address,
+-				   PAGE_OFFSET + s->dma_address + s->length);
++		flush_dcache_range(dma_addr_to_virt(s->dma_address),
++				   dma_addr_to_virt(s->dma_address + s->length));
+ 	}
+ 
+ 	return nents;
+@@ -149,11 +161,6 @@ static inline void dma_sync(void *addr, size_t size,
+ 	}
+ }
+ 
+-static inline void *dma_addr_to_virt(dma_addr_t dma_addr)
+-{
+-	return phys_to_virt((unsigned long) dma_addr);
+-}
+-
+ /**
+  * hexagon_map_page() - maps an address for device DMA
+  * @dev:	pointer to DMA device
+-- 
+1.7.9.5
+

@@ -1,0 +1,43 @@
+From a52e275cad549ce1d590a593097aceb72656300f Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Sun, 28 Oct 2012 19:54:37 -0500
+Subject: [PATCH 13/32] Hexagon: add support for additional exceptions
+
+Add multi-reg-write and unaligned-PC exceptions.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/traps.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/hexagon/kernel/traps.c b/arch/hexagon/kernel/traps.c
+index d59ee62..12164a3 100644
+--- a/arch/hexagon/kernel/traps.c
++++ b/arch/hexagon/kernel/traps.c
+@@ -65,6 +65,10 @@ static const char *ex_name(int ex)
+ 		return "Write protection fault";
+ 	case HVM_GE_C_XMAL:
+ 		return "Misaligned instruction";
++	case HVM_GE_C_WREG:
++		return "Multiple writes to same register in packet";
++	case HVM_GE_C_PCAL:
++		return "Program counter values that are not properly aligned";
+ 	case HVM_GE_C_RMAL:
+ 		return "Misaligned data load";
+ 	case HVM_GE_C_WMAL:
+@@ -324,6 +328,12 @@ void do_genex(struct pt_regs *regs)
+ 	case HVM_GE_C_XMAL:
+ 		misaligned_instruction(regs);
+ 		break;
++	case HVM_GE_C_WREG:
++		illegal_instruction(regs);
++		break;
++	case HVM_GE_C_PCAL:
++		misaligned_instruction(regs);
++		break;
+ 	case HVM_GE_C_RMAL:
+ 		misaligned_data_load(regs);
+ 		break;
+-- 
+1.7.9.5
+

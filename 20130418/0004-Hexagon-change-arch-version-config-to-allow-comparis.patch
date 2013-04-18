@@ -1,0 +1,108 @@
+From 3fd5dcadff59b517c8878d170608d514e82c800f Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 27 Mar 2012 17:37:33 -0500
+Subject: [PATCH 04/32] Hexagon: change arch version config to allow
+ comparisons
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig           |   18 ++++--------------
+ arch/hexagon/Makefile          |   17 +++--------------
+ arch/hexagon/include/asm/elf.h |    6 +++---
+ 3 files changed, 10 insertions(+), 31 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index dd89a72..d90a495 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -33,19 +33,6 @@ config HEXAGON
+ 	  Qualcomm Hexagon is a processor architecture designed for high
+ 	  performance and low power across a wide variety of applications.
+ 
+-
+-config HEXAGON_ARCH_V1
+-	bool
+-
+-config HEXAGON_ARCH_V2
+-	bool
+-
+-config HEXAGON_ARCH_V3
+-	bool
+-
+-config HEXAGON_ARCH_V4
+-	bool
+-
+ config HEXAGON_PHYS_OFFSET
+ 	def_bool y
+ 	---help---
+@@ -109,12 +96,15 @@ choice
+ 
+ config HEXAGON_COMET
+ 	bool "Comet Board"
+-	select HEXAGON_ARCH_V2
+ 	---help---
+ 	  Support for the Comet platform.
+ 
+ endchoice
+ 
++config HEXAGON_ARCH_VERSION
++	int "Architecture version"
++	default 2
++
+ config HEXAGON_VM
+ 	def_bool y
+ 
+diff --git a/arch/hexagon/Makefile b/arch/hexagon/Makefile
+index d00d900..207711a0 100644
+--- a/arch/hexagon/Makefile
++++ b/arch/hexagon/Makefile
+@@ -15,20 +15,9 @@ KBUILD_CFLAGS += -fno-short-enums
+ # LDFLAGS_MODULE += -shared
+ CFLAGS_MODULE += -mlong-calls
+ 
+-cflags-$(CONFIG_HEXAGON_ARCH_V1) += $(call cc-option,-mv1)
+-cflags-$(CONFIG_HEXAGON_ARCH_V2) += $(call cc-option,-mv2)
+-cflags-$(CONFIG_HEXAGON_ARCH_V3) += $(call cc-option,-mv3)
+-cflags-$(CONFIG_HEXAGON_ARCH_V4) += $(call cc-option,-mv4)
+-
+-aflags-$(CONFIG_HEXAGON_ARCH_V1) += $(call cc-option,-mv1)
+-aflags-$(CONFIG_HEXAGON_ARCH_V2) += $(call cc-option,-mv2)
+-aflags-$(CONFIG_HEXAGON_ARCH_V3) += $(call cc-option,-mv3)
+-aflags-$(CONFIG_HEXAGON_ARCH_V4) += $(call cc-option,-mv4)
+-
+-ldflags-$(CONFIG_HEXAGON_ARCH_V1) += $(call cc-option,-mv1)
+-ldflags-$(CONFIG_HEXAGON_ARCH_V2) += $(call cc-option,-mv2)
+-ldflags-$(CONFIG_HEXAGON_ARCH_V3) += $(call cc-option,-mv3)
+-ldflags-$(CONFIG_HEXAGON_ARCH_V4) += $(call cc-option,-mv4)
++cflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
++aflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
++ldflags-y += $(call cc-option,-mv${CONFIG_HEXAGON_ARCH_VERSION})
+ 
+ KBUILD_CFLAGS += $(cflags-y)
+ KBUILD_AFLAGS += $(aflags-y)
+diff --git a/arch/hexagon/include/asm/elf.h b/arch/hexagon/include/asm/elf.h
+index 1f14e08..83b8d0e 100644
+--- a/arch/hexagon/include/asm/elf.h
++++ b/arch/hexagon/include/asm/elf.h
+@@ -168,15 +168,15 @@ do {					\
+ #define ELF_DATA	ELFDATA2LSB
+ #define ELF_ARCH	EM_HEXAGON
+ 
+-#ifdef CONFIG_HEXAGON_ARCH_V2
++#if CONFIG_HEXAGON_ARCH_VERSION == 2
+ #define ELF_CORE_EFLAGS 0x1
+ #endif
+ 
+-#ifdef CONFIG_HEXAGON_ARCH_V3
++#if CONFIG_HEXAGON_ARCH_VERSION == 3
+ #define ELF_CORE_EFLAGS 0x2
+ #endif
+ 
+-#ifdef CONFIG_HEXAGON_ARCH_V4
++#if CONFIG_HEXAGON_ARCH_VERSION == 4
+ #define ELF_CORE_EFLAGS 0x3
+ #endif
+ 
+-- 
+1.7.9.5
+

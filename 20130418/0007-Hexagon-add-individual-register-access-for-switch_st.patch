@@ -1,0 +1,74 @@
+From e199fb44f06cc324bcdae28170a8b360a064cded Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 10 May 2012 17:40:14 -0500
+Subject: [PATCH 07/32] Hexagon: add individual register access for
+ switch_stack
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/processor.h |   49 +++++++++++++++++++++++++++++-----
+ 1 file changed, 43 insertions(+), 6 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/processor.h b/arch/hexagon/include/asm/processor.h
+index 6dd5d37..758bcd1 100644
+--- a/arch/hexagon/include/asm/processor.h
++++ b/arch/hexagon/include/asm/processor.h
+@@ -100,12 +100,49 @@ extern unsigned long get_wchan(struct task_struct *p);
+  */
+ 
+ struct hexagon_switch_stack {
+-	unsigned long long	r1716;
+-	unsigned long long	r1918;
+-	unsigned long long	r2120;
+-	unsigned long long	r2322;
+-	unsigned long long	r2524;
+-	unsigned long long	r2726;
++	union {
++		struct {
++			unsigned long r16;
++			unsigned long r17;
++		};
++		unsigned long long	r1716;
++	};
++	union {
++		struct {
++			unsigned long r18;
++			unsigned long r19;
++		};
++		unsigned long long	r1918;
++	};
++	union {
++		struct {
++			unsigned long r20;
++			unsigned long r21;
++		};
++		unsigned long long	r2120;
++	};
++	union {
++		struct {
++			unsigned long r22;
++			unsigned long r23;
++		};
++		unsigned long long	r2322;
++	};
++	union {
++		struct {
++			unsigned long r24;
++			unsigned long r25;
++		};
++		unsigned long long	r2524;
++	};
++	union {
++		struct {
++			unsigned long r26;
++			unsigned long r27;
++		};
++		unsigned long long	r2726;
++	};
++
+ 	unsigned long		fp;
+ 	unsigned long		lr;
+ };
+-- 
+1.7.9.5
+

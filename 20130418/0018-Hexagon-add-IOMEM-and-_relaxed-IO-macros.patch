@@ -1,0 +1,45 @@
+From 6bc98e58dd4db0390a1e87e2d10d9b1101c0a359 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Fri, 1 Mar 2013 13:16:15 -0600
+Subject: [PATCH 18/32] Hexagon: add IOMEM and _relaxed IO macros
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/io.h |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
+index e527cfe..6199ed5 100644
+--- a/arch/hexagon/include/asm/io.h
++++ b/arch/hexagon/include/asm/io.h
+@@ -40,6 +40,8 @@
+ #define IO_SPACE_LIMIT 0xffff
+ #define _IO_BASE ((void __iomem *)0xfe000000)
+ 
++#define IOMEM(x)        ((void __force __iomem *)(x))
++
+ extern int remap_area_pages(unsigned long start, unsigned long phys_addr,
+ 				unsigned long end, unsigned long flags);
+ 
+@@ -176,6 +178,18 @@ static inline void writel(u32 data, volatile void __iomem *addr)
+ #define __raw_readl readl
+ 
+ /*
++ * http://comments.gmane.org/gmane.linux.ports.arm.kernel/117626
++ */
++
++#define readb_relaxed __raw_readb
++#define readw_relaxed __raw_readw
++#define readl_relaxed __raw_readl
++
++#define writeb_relaxed __raw_writeb
++#define writew_relaxed __raw_writew
++#define writel_relaxed __raw_writel
++
++/*
+  * Need an mtype somewhere in here, for cache type deals?
+  * This is probably too long for an inline.
+  */
+-- 
+1.7.9.5
+

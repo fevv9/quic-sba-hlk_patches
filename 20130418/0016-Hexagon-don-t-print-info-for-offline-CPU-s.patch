@@ -1,0 +1,29 @@
+From 5a7c061c0752f44c45aeaa33af209f6c548ad696 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 4 Feb 2013 14:17:15 -0600
+Subject: [PATCH 16/32] Hexagon: don't print info for offline CPU's
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/setup.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index 2e2304f..d2dcb6b 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -130,6 +130,11 @@ static int show_cpuinfo(struct seq_file *m, void *v)
+ {
+ 	int cpu = (unsigned long) v - 1;
+ 
++#ifdef CONFIG_SMP
++	if (!cpu_online(cpu))
++		return 0;
++#endif
++
+ 	seq_printf(m, "processor\t: %d\n", cpu);
+ 	seq_printf(m, "model name\t: Hexagon Virtual Machine\n");
+ 	seq_printf(m, "BogoMips\t: %lu.%02lu\n",
+-- 
+1.7.9.5
+

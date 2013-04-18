@@ -1,0 +1,373 @@
+From 974b67e9469aa05da7a2a410e6bedd521d577440 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Fri, 22 Mar 2013 16:05:40 -0500
+Subject: [PATCH 03/32] Hexagon: add support for ARCH_PFN_OFFSET
+
+Add support for loading the kernel at a physical offset.  The
+offset should still be 4M aligned.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig                  |    6 +++++
+ arch/hexagon/include/asm/hexagon_vm.h |   47 +++++++++++++++++----------------
+ arch/hexagon/include/asm/mem-layout.h |   21 ++++++++++-----
+ arch/hexagon/include/asm/page.h       |    5 ++--
+ arch/hexagon/kernel/head.S            |   22 ++++++++++++---
+ arch/hexagon/kernel/setup.c           |    2 ++
+ arch/hexagon/kernel/vmlinux.lds.S     |   10 ++-----
+ arch/hexagon/mm/init.c                |   33 ++++++++++++++---------
+ 8 files changed, 91 insertions(+), 55 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index e4decc6..dd89a72 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -33,6 +33,7 @@ config HEXAGON
+ 	  Qualcomm Hexagon is a processor architecture designed for high
+ 	  performance and low power across a wide variety of applications.
+ 
++
+ config HEXAGON_ARCH_V1
+ 	bool
+ 
+@@ -45,6 +46,11 @@ config HEXAGON_ARCH_V3
+ config HEXAGON_ARCH_V4
+ 	bool
+ 
++config HEXAGON_PHYS_OFFSET
++	def_bool y
++	---help---
++	  Platforms that don't load the kernel at zero set this.
++
+ config FRAME_POINTER
+ 	def_bool y
+ 
+diff --git a/arch/hexagon/include/asm/hexagon_vm.h b/arch/hexagon/include/asm/hexagon_vm.h
+index c144bee..6b81e4d 100644
+--- a/arch/hexagon/include/asm/hexagon_vm.h
++++ b/arch/hexagon/include/asm/hexagon_vm.h
+@@ -31,10 +31,26 @@
+  * for tracing/debugging.
+  */
+ 
+-/*
+- * Lets make this stuff visible only if configured,
+- * so we can unconditionally include the file.
+- */
++#define HVM_TRAP1_VMVERSION		0
++#define HVM_TRAP1_VMRTE			1
++#define HVM_TRAP1_VMSETVEC		2
++#define HVM_TRAP1_VMSETIE		3
++#define HVM_TRAP1_VMGETIE		4
++#define HVM_TRAP1_VMINTOP		5
++#define HVM_TRAP1_VMCLRMAP		10
++#define HVM_TRAP1_VMNEWMAP		11
++#define HVM_TRAP1_FORMERLY_VMWIRE	12
++#define HVM_TRAP1_VMCACHE		13
++#define HVM_TRAP1_VMGETTIME		14
++#define HVM_TRAP1_VMSETTIME		15
++#define HVM_TRAP1_VMWAIT		16
++#define HVM_TRAP1_VMYIELD		17
++#define HVM_TRAP1_VMSTART		18
++#define HVM_TRAP1_VMSTOP		19
++#define HVM_TRAP1_VMVPID		20
++#define HVM_TRAP1_VMSETREGS		21
++#define HVM_TRAP1_VMGETREGS		22
++#define HVM_TRAP1_VMTIMEROP		24
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -175,25 +191,6 @@ static inline long __vmintop_clear(long i)
+ 
+ #else /* Only assembly code should reference these */
+ 
+-#define HVM_TRAP1_VMRTE			1
+-#define HVM_TRAP1_VMSETVEC		2
+-#define HVM_TRAP1_VMSETIE		3
+-#define HVM_TRAP1_VMGETIE		4
+-#define HVM_TRAP1_VMINTOP		5
+-#define HVM_TRAP1_VMCLRMAP		10
+-#define HVM_TRAP1_VMNEWMAP		11
+-#define HVM_TRAP1_FORMERLY_VMWIRE	12
+-#define HVM_TRAP1_VMCACHE		13
+-#define HVM_TRAP1_VMGETTIME		14
+-#define HVM_TRAP1_VMSETTIME		15
+-#define HVM_TRAP1_VMWAIT		16
+-#define HVM_TRAP1_VMYIELD		17
+-#define HVM_TRAP1_VMSTART		18
+-#define HVM_TRAP1_VMSTOP		19
+-#define HVM_TRAP1_VMVPID		20
+-#define HVM_TRAP1_VMSETREGS		21
+-#define HVM_TRAP1_VMGETREGS		22
+-
+ #endif /* __ASSEMBLY__ */
+ 
+ /*
+@@ -224,6 +221,8 @@ static inline long __vmintop_clear(long i)
+ #define HVM_VMEST_UM_MSK	1
+ #define HVM_VMEST_IE_SFT	30
+ #define HVM_VMEST_IE_MSK	1
++#define HVM_VMEST_SS_SFT	29
++#define HVM_VMEST_SS_MSK	1
+ #define HVM_VMEST_EVENTNUM_SFT	16
+ #define HVM_VMEST_EVENTNUM_MSK	0xff
+ #define HVM_VMEST_CAUSE_SFT	0
+@@ -260,6 +259,8 @@ static inline long __vmintop_clear(long i)
+ #define HVM_GE_C_INVI	0x15
+ #define HVM_GE_C_PRIVI	0x1B
+ #define HVM_GE_C_XMAL	0x1C
++#define HVM_GE_C_WREG	0x1D
++#define HVM_GE_C_PCAL	0x1E
+ #define HVM_GE_C_RMAL	0x20
+ #define HVM_GE_C_WMAL	0x21
+ #define HVM_GE_C_RPROT	0x22
+diff --git a/arch/hexagon/include/asm/mem-layout.h b/arch/hexagon/include/asm/mem-layout.h
+index af16e97..1426cd7 100644
+--- a/arch/hexagon/include/asm/mem-layout.h
++++ b/arch/hexagon/include/asm/mem-layout.h
+@@ -32,16 +32,25 @@
+ #define PAGE_OFFSET			_AC(0xc0000000, UL)
+ 
+ /*
+- * LOAD_ADDRESS is the physical/linear address of where in memory
+- * the kernel gets loaded. The 12 least significant bits must be zero (0)
+- * due to limitations on setting the EVB
+- *
++ * Compiling for a platform that needs a crazy physical offset
++ * (like if the memory starts at 1GB and up) means we need
++ * an actual PHYS_OFFSET.  Should be set up in head.S.
+  */
+ 
+-#ifndef LOAD_ADDRESS
+-#define LOAD_ADDRESS			0x00000000
++#ifdef CONFIG_HEXAGON_PHYS_OFFSET
++#ifndef __ASSEMBLY__
++extern unsigned long	__phys_offset;
++#endif
++#define PHYS_OFFSET	__phys_offset
++#endif
++
++#ifndef PHYS_OFFSET
++#define PHYS_OFFSET	0
+ #endif
+ 
++#define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
++#define ARCH_PFN_OFFSET	PHYS_PFN_OFFSET
++
+ #define TASK_SIZE			(PAGE_OFFSET)
+ 
+ /*  not sure how these are used yet  */
+diff --git a/arch/hexagon/include/asm/page.h b/arch/hexagon/include/asm/page.h
+index 692adc213..de1b287 100644
+--- a/arch/hexagon/include/asm/page.h
++++ b/arch/hexagon/include/asm/page.h
+@@ -96,8 +96,8 @@ typedef struct page *pgtable_t;
+  * MIPS says they're only used during mem_init.
+  * also, check if we need a PHYS_OFFSET.
+  */
+-#define __pa(x) ((unsigned long)(x) - PAGE_OFFSET)
+-#define __va(x) ((void *)((unsigned long)(x) + PAGE_OFFSET))
++#define __pa(x) ((unsigned long)(x) - PAGE_OFFSET + PHYS_OFFSET)
++#define __va(x) ((void *)((unsigned long)(x) - PHYS_OFFSET + PAGE_OFFSET))
+ 
+ /* The "page frame" descriptor is defined in linux/mm.h */
+ struct page;
+@@ -147,6 +147,7 @@ static inline void clear_page(void *page)
+  */
+ #define kern_addr_valid(addr)   (1)
+ 
++#include <asm/mem-layout.h>
+ #include <asm-generic/memory_model.h>
+ /* XXX Todo: implement assembly-optimized version of getorder. */
+ #include <asm-generic/getorder.h>
+diff --git a/arch/hexagon/kernel/head.S b/arch/hexagon/kernel/head.S
+index d859402..477320c 100644
+--- a/arch/hexagon/kernel/head.S
++++ b/arch/hexagon/kernel/head.S
+@@ -43,14 +43,21 @@ ENTRY(stext)
+ 	 * Symbol is kernel segment address, but we need
+ 	 * the logical/physical address.
+ 	 */
+-	r24 = asl(r24, #2)
+-	r24 = lsr(r24, #2)
++	r25 = pc;
++	r2.h = #0xffc0;
++	r2.l = #0x0000;
++	r25 = and(r2,r25);	/*  R25 holds PHYS_OFFSET now  */
++	r1.h = #HI(PAGE_OFFSET);
++	r1.l = #LO(PAGE_OFFSET);
++	r24 = sub(r24,r1);	/* swapper_pg_dir - PAGE_OFFSET */
++	r24 = add(r24,r25);	/* + PHYS_OFFSET */
+ 
+-	r0 = r24
++	r0 = r24;  /* aka __pa(swapper_pg_dir)  */
+ 
+ 	/*
+-	 * Initialize a 16MB PTE to make the virtual and physical
++	 * Initialize page dir to make the virtual and physical
+ 	 * addresses where the kernel was loaded be identical.
++	 * Done in 4MB chunks.
+ 	 */
+ #define PTE_BITS ( __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X	\
+ 		  | __HEXAGON_C_WB_L2 << 6			\
+@@ -143,6 +150,13 @@ __head_s_vaddr_target:
+ 	r2 = sub(r2,r0);
+ 	call memset;
+ 
++	/*  Set PHYS_OFFSET; should still be in R25 */
++#ifdef CONFIG_HEXAGON_PHYS_OFFSET
++	r0.l = #LO(__phys_offset);
++	r0.h = #HI(__phys_offset);
++	memw(r0) = r25;
++#endif
++
+ 	/* Time to make the doughnuts.   */
+ 	call start_kernel
+ 
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index 94a3878..2e2304f 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -68,6 +68,8 @@ void __init setup_arch(char **cmdline_p)
+ 	 */
+ 	__vmsetvec(_K_VM_event_vector);
+ 
++	printk(KERN_INFO "PHYS_OFFSET=0x%08x\n", PHYS_OFFSET);
++
+ 	/*
+ 	 * Simulator has a few differences from the hardware.
+ 	 * For now, check uninitialized-but-mapped memory
+diff --git a/arch/hexagon/kernel/vmlinux.lds.S b/arch/hexagon/kernel/vmlinux.lds.S
+index 14e793f..fafb886 100644
+--- a/arch/hexagon/kernel/vmlinux.lds.S
++++ b/arch/hexagon/kernel/vmlinux.lds.S
+@@ -18,8 +18,6 @@
+  * 02110-1301, USA.
+  */
+ 
+-#define LOAD_OFFSET PAGE_OFFSET
+-
+ #include <asm-generic/vmlinux.lds.h>
+ #include <asm/asm-offsets.h>	/*  Most of the kernel defines are here  */
+ #include <asm/mem-layout.h>	/*  except for page_offset  */
+@@ -36,13 +34,9 @@ See asm-generic/sections.h for seemingly required labels.
+ 
+ #define PAGE_SIZE _PAGE_SIZE
+ 
+-/*  This LOAD_OFFSET is temporary for debugging on the simulator; it may change
+-    for hypervisor pseudo-physical memory.  */
+-
+-
+ SECTIONS
+ {
+-	. = PAGE_OFFSET + LOAD_ADDRESS;
++	. = PAGE_OFFSET;
+ 
+ 	__init_begin = .;
+ 	HEAD_TEXT_SECTION
+@@ -52,7 +46,7 @@ SECTIONS
+ 
+         . = ALIGN(_PAGE_SIZE);
+ 	_stext = .;
+-	.text : AT(ADDR(.text) - LOAD_OFFSET) {
++	.text : AT(ADDR(.text)) {
+ 		_text = .;
+ 		TEXT_TEXT
+ 		SCHED_TEXT
+diff --git a/arch/hexagon/mm/init.c b/arch/hexagon/mm/init.c
+index 69ffcfd..8e803a6 100644
+--- a/arch/hexagon/mm/init.c
++++ b/arch/hexagon/mm/init.c
+@@ -31,9 +31,10 @@
+  * Define a startpg just past the end of the kernel image and a lastpg
+  * that corresponds to the end of real or simulated platform memory.
+  */
+-#define bootmem_startpg (PFN_UP(((unsigned long) _end) - PAGE_OFFSET))
++#define bootmem_startpg (PFN_UP(((unsigned long) _end) - PAGE_OFFSET + PHYS_OFFSET))
+ 
+-unsigned long bootmem_lastpg;  /*  Should be set by platform code  */
++unsigned long bootmem_lastpg;	/*  Should be set by platform code  */
++unsigned long __phys_offset;	/*  physical kernel offset >> 12  */
+ 
+ /*  Set as variable to limit PMD copies  */
+ int max_kernel_seg = 0x303;
+@@ -44,7 +45,6 @@ unsigned long zero_page_mask;
+ /*  indicate pfn's of high memory  */
+ unsigned long highstart_pfn, highend_pfn;
+ 
+-/* struct mmu_gather defined in asm-generic.h;  */
+ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+ 
+ /* Default cache attribute for newly created page tables */
+@@ -71,7 +71,7 @@ void __init mem_init(void)
+ {
+ 	/*  No idea where this is actually declared.  Seems to evade LXR.  */
+ 	totalram_pages += free_all_bootmem();
+-	num_physpages = bootmem_lastpg;	/*  seriously, what?  */
++	num_physpages = bootmem_lastpg-ARCH_PFN_OFFSET;
+ 
+ 	printk(KERN_INFO "totalram_pages = %ld\n", totalram_pages);
+ 
+@@ -193,6 +193,9 @@ void __init setup_arch_memory(void)
+ 	 * This needs to change for highmem setups.
+ 	 */
+ 
++	/*  Prior to this, bootmem_lastpg is actually mem size  */
++	bootmem_lastpg += ARCH_PFN_OFFSET;
++
+ 	/* Memory size needs to be a multiple of 16M */
+ 	bootmem_lastpg = PFN_DOWN((bootmem_lastpg << PAGE_SHIFT) &
+ 		~((BIG_KERNEL_PAGE_SIZE) - 1));
+@@ -201,12 +204,15 @@ void __init setup_arch_memory(void)
+ 	 * Reserve the top DMA_RESERVE bytes of RAM for DMA (uncached)
+ 	 * memory allocation
+ 	 */
+-	bootmap_size = init_bootmem(bootmem_startpg, bootmem_lastpg -
+-				    PFN_DOWN(DMA_RESERVED_BYTES));
++
++	max_low_pfn = bootmem_lastpg - PFN_DOWN(DMA_RESERVED_BYTES);
++	min_low_pfn = ARCH_PFN_OFFSET;
++	bootmap_size =  init_bootmem_node(NODE_DATA(0), bootmem_startpg, min_low_pfn, max_low_pfn);
+ 
+ 	printk(KERN_INFO "bootmem_startpg:  0x%08lx\n", bootmem_startpg);
+ 	printk(KERN_INFO "bootmem_lastpg:  0x%08lx\n", bootmem_lastpg);
+ 	printk(KERN_INFO "bootmap_size:  %d\n", bootmap_size);
++	printk(KERN_INFO "min_low_pfn:  0x%08lx\n", min_low_pfn);
+ 	printk(KERN_INFO "max_low_pfn:  0x%08lx\n", max_low_pfn);
+ 
+ 	/*
+@@ -221,14 +227,17 @@ void __init setup_arch_memory(void)
+ 	/*  this actually only goes to the end of the first gig  */
+ 	segtable_end = segtable + (1<<(30-22));
+ 
+-	/*  Move forward to the start of empty pages  */
+-	segtable += bootmem_lastpg >> (22-PAGE_SHIFT);
++	/*
++	 * Move forward to the start of empty pages; take into account
++	 * phys_offset shift.
++	 */
+ 
++	segtable += (bootmem_lastpg-ARCH_PFN_OFFSET)>>(22-PAGE_SHIFT);
+ 	{
+-	    int i;
++		int i;
+ 
+-	    for (i = 1 ; i <= DMA_RESERVE ; i++)
+-		segtable[-i] = ((segtable[-i] & __HVM_PTE_PGMASK_4MB)
++		for (i = 1 ; i <= DMA_RESERVE ; i++)
++			segtable[-i] = ((segtable[-i] & __HVM_PTE_PGMASK_4MB)
+ 				| __HVM_PTE_R | __HVM_PTE_W | __HVM_PTE_X
+ 				| __HEXAGON_C_UNC << 6
+ 				| __HVM_PDE_S_4MB);
+@@ -256,7 +265,7 @@ void __init setup_arch_memory(void)
+ 	 * Free all the memory that wasn't taken up by the bootmap, the DMA
+ 	 * reserve, or kernel itself.
+ 	 */
+-	free_bootmem(PFN_PHYS(bootmem_startpg)+bootmap_size,
++	free_bootmem(PFN_PHYS(bootmem_startpg) + bootmap_size,
+ 		     PFN_PHYS(bootmem_lastpg - bootmem_startpg) - bootmap_size -
+ 		     DMA_RESERVED_BYTES);
+ 
+-- 
+1.7.9.5
+

@@ -1,0 +1,27 @@
+From ed6d5bb925cc91150f781430fca60c7e9cf267c3 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 8 Apr 2013 19:03:05 -0500
+Subject: [PATCH 31/32] Hexagon: use correct translation for VMALLOC_START
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/mem-layout.h |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/mem-layout.h b/arch/hexagon/include/asm/mem-layout.h
+index 2cb7a70..60556f8 100644
+--- a/arch/hexagon/include/asm/mem-layout.h
++++ b/arch/hexagon/include/asm/mem-layout.h
+@@ -72,8 +72,7 @@ extern int max_kernel_seg;
+  * supposed to be based on the amount of physical memory available
+  */
+ 
+-#define VMALLOC_START (PAGE_OFFSET + VMALLOC_OFFSET + \
+-	(unsigned long)high_memory)
++#define VMALLOC_START ((unsigned long) __va(high_memory + VMALLOC_OFFSET))
+ 
+ /* Gap between physical ram and vmalloc space for guard purposes. */
+ #define VMALLOC_OFFSET PAGE_SIZE
+-- 
+1.7.9.5
+

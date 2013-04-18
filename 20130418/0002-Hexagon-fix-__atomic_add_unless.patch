@@ -1,0 +1,64 @@
+From c1d5e479d8a99de0417c44ddf9dbd8dab541c91e Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 21 Mar 2013 18:24:19 -0500
+Subject: [PATCH 02/32] Hexagon: fix __atomic_add_unless
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/atomic.h |   20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/atomic.h b/arch/hexagon/include/asm/atomic.h
+index 468fbb0..c667039 100644
+--- a/arch/hexagon/include/asm/atomic.h
++++ b/arch/hexagon/include/asm/atomic.h
+@@ -117,35 +117,37 @@ static inline int atomic_sub_return(int i, atomic_t *v)
+ #define atomic_sub(i, v) atomic_sub_return(i, (v))
+ 
+ /**
+- * atomic_add_unless - add unless the number is a given value
++ * __atomic_add_unless - add unless the number is a given value
+  * @v: pointer to value
+  * @a: amount to add
+  * @u: unless value is equal to u
+  *
+- * Returns 1 if the add happened, 0 if it didn't.
++ * Returns old value.
++ *
+  */
++
+ static inline int __atomic_add_unless(atomic_t *v, int a, int u)
+ {
+-	int output, __oldval;
++	int __oldval;
++	register int tmp;
++
+ 	asm volatile(
+ 		"1:	%0 = memw_locked(%2);"
+ 		"	{"
+ 		"		p3 = cmp.eq(%0, %4);"
+ 		"		if (p3.new) jump:nt 2f;"
+-		"		%0 = add(%0, %3);"
+-		"		%1 = #0;"
++		"		%1 = add(%0, %3);"
+ 		"	}"
+-		"	memw_locked(%2, p3) = %0;"
++		"	memw_locked(%2, p3) = %1;"
+ 		"	{"
+ 		"		if !p3 jump 1b;"
+-		"		%1 = #1;"
+ 		"	}"
+ 		"2:"
+-		: "=&r" (__oldval), "=&r" (output)
++		: "=&r" (__oldval), "=&r" (tmp)
+ 		: "r" (v), "r" (a), "r" (u)
+ 		: "memory", "p3"
+ 	);
+-	return output;
++	return __oldval;
+ }
+ 
+ #define atomic_inc_not_zero(v) atomic_add_unless((v), 1, 0)
+-- 
+1.7.9.5
+

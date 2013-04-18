@@ -1,0 +1,27 @@
+From 27c63743964673a0dbf6a485b0d80e17f6b98477 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 23 Oct 2012 18:26:20 -0500
+Subject: [PATCH 22/32] Hexagon: break up user fn/arg register setting
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/process.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/hexagon/kernel/process.c b/arch/hexagon/kernel/process.c
+index c300ce3..a91b290 100644
+--- a/arch/hexagon/kernel/process.c
++++ b/arch/hexagon/kernel/process.c
+@@ -113,7 +113,8 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
+ 	if (unlikely(p->flags & PF_KTHREAD)) {
+ 		memset(childregs, 0, sizeof(struct pt_regs));
+ 		/* r24 <- fn, r25 <- arg */
+-		ss->r2524 = usp | ((u64)arg << 32);
++		ss->r24 = usp;
++		ss->r25 = arg;
+ 		pt_set_kmode(childregs);
+ 		return 0;
+ 	}
+-- 
+1.7.9.5
+

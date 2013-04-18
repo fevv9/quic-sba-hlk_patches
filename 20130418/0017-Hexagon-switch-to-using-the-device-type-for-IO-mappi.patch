@@ -1,0 +1,41 @@
+From 0c9c7fb0eb9181ad0fa8e79c2ae8a3494ed94fec Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 5 Feb 2013 14:23:37 -0600
+Subject: [PATCH 17/32] Hexagon: switch to using the device type for IO
+ mappings
+
+Uncached on our architecture can still have side effects
+such as canceled/replayed transactions; device type prevents
+this.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/vm_mmu.h |    9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/vm_mmu.h b/arch/hexagon/include/asm/vm_mmu.h
+index 9a94de7..e67b573 100644
+--- a/arch/hexagon/include/asm/vm_mmu.h
++++ b/arch/hexagon/include/asm/vm_mmu.h
+@@ -68,14 +68,13 @@
+ 
+ #define __HEXAGON_C_WB		0x0	/* Write-back, no L2 */
+ #define	__HEXAGON_C_WT		0x1	/* Write-through, no L2 */
++#define	__HEXAGON_C_UNC		0x6	/* Uncached memory */
++#if CONFIG_HEXAGON_ARCH_VERSION >= 2
+ #define	__HEXAGON_C_DEV		0x4	/* Device register space */
+-#define	__HEXAGON_C_WT_L2	0x5	/* Write-through, with L2 */
+-/* this really should be #if CONFIG_HEXAGON_ARCH = 2 but that's not defined */
+-#if defined(CONFIG_HEXAGON_COMET) || defined(CONFIG_QDSP6_ST1)
+-#define __HEXAGON_C_UNC		__HEXAGON_C_DEV
+ #else
+-#define	__HEXAGON_C_UNC		0x6	/* Uncached memory */
++#define __HEXAGON_C_DEV		__HEXAGON_C_UNC
+ #endif
++#define	__HEXAGON_C_WT_L2	0x5	/* Write-through, with L2 */
+ #define	__HEXAGON_C_WB_L2	0x7	/* Write-back, with L2 */
+ 
+ /*
+-- 
+1.7.9.5
+

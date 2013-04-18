@@ -1,0 +1,121 @@
+From bb87b4c337d4f7aab40bc2cb8a69416d5adb84a7 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 7 Mar 2013 12:03:10 -0600
+Subject: [PATCH 15/32] Hexagon: add support for single-stepping (v4+)
+
+Hardware single-step is only available on v4 and later
+architectures.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/uapi/asm/ptrace.h    |    5 +++++
+ arch/hexagon/include/uapi/asm/registers.h |    3 +++
+ arch/hexagon/kernel/ptrace.c              |   15 +++++++++++++++
+ arch/hexagon/kernel/traps.c               |   11 +++++++++++
+ arch/hexagon/kernel/vm_entry.S            |    3 +++
+ arch/hexagon/kernel/vm_vectors.S          |    2 +-
+ 6 files changed, 38 insertions(+), 1 deletion(-)
+
+diff --git a/arch/hexagon/include/uapi/asm/ptrace.h b/arch/hexagon/include/uapi/asm/ptrace.h
+index 1ffce0c..065e5b3 100644
+--- a/arch/hexagon/include/uapi/asm/ptrace.h
++++ b/arch/hexagon/include/uapi/asm/ptrace.h
+@@ -36,4 +36,9 @@ extern const char *regs_query_register_name(unsigned int offset);
+ 	((struct pt_regs *) \
+ 	 ((unsigned long)current_thread_info() + THREAD_SIZE) - 1)
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION >= 4
++#define arch_has_single_step()	(1)
++#endif
++
++
+ #endif
+diff --git a/arch/hexagon/include/uapi/asm/registers.h b/arch/hexagon/include/uapi/asm/registers.h
+index 8050415..fcdb5f9 100644
+--- a/arch/hexagon/include/uapi/asm/registers.h
++++ b/arch/hexagon/include/uapi/asm/registers.h
+@@ -211,6 +211,9 @@ struct pt_regs {
+ #define pt_psp(regs) ((regs)->hvmer.vmpsp)
+ #define pt_badva(regs) ((regs)->hvmer.vmbadva)
+ 
++#define pt_set_singlestep(regs) ((regs)->hvmer.vmest |= (1<<HVM_VMEST_SS_SFT))
++#define pt_clr_singlestep(regs) ((regs)->hvmer.vmest &= ~(1<<HVM_VMEST_SS_SFT))
++
+ #define pt_set_rte_sp(regs, sp) do {\
+ 	pt_psp(regs) = (sp);\
+ 	(regs)->SP = (unsigned long) &((regs)->hvmer);\
+diff --git a/arch/hexagon/kernel/ptrace.c b/arch/hexagon/kernel/ptrace.c
+index 3982d9c..70df50d 100644
+--- a/arch/hexagon/kernel/ptrace.c
++++ b/arch/hexagon/kernel/ptrace.c
+@@ -32,6 +32,21 @@
+ 
+ #include <asm/user.h>
+ 
++#if arch_has_single_step()
++/*  Both called from ptrace_resume  */
++void user_enable_single_step(struct task_struct *child)
++{
++	pt_set_singlestep(task_pt_regs(child));
++	set_tsk_thread_flag(child, TIF_SINGLESTEP);
++}
++
++void user_disable_single_step(struct task_struct *child)
++{
++	pt_clr_singlestep(task_pt_regs(child));
++	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
++}
++#endif
++
+ static int genregs_get(struct task_struct *target,
+ 		   const struct user_regset *regset,
+ 		   unsigned int pos, unsigned int count,
+diff --git a/arch/hexagon/kernel/traps.c b/arch/hexagon/kernel/traps.c
+index 12164a3..c2eeeef 100644
+--- a/arch/hexagon/kernel/traps.c
++++ b/arch/hexagon/kernel/traps.c
+@@ -451,3 +451,14 @@ void do_machcheck(struct pt_regs *regs)
+ 	/* Halt and catch fire */
+ 	__vmstop();
+ }
++
++/*
++ * Treat this like the old 0xdb trap.
++ */
++
++void do_debug_exception(struct pt_regs *regs)
++{
++	regs->hvmer.vmest &= ~HVM_VMEST_CAUSE_MSK;
++	regs->hvmer.vmest |= (TRAP_DEBUG << HVM_VMEST_CAUSE_SFT);
++	do_trap0(regs);
++}
+diff --git a/arch/hexagon/kernel/vm_entry.S b/arch/hexagon/kernel/vm_entry.S
+index 053551e..9add73a 100644
+--- a/arch/hexagon/kernel/vm_entry.S
++++ b/arch/hexagon/kernel/vm_entry.S
+@@ -367,6 +367,9 @@ _K_enter_trap0:
+ _K_enter_machcheck:
+ 	vm_event_entry(do_machcheck)
+ 
++	.globl _K_enter_debug
++_K_enter_debug:
++	vm_event_entry(do_debug_exception)
+ 
+ 	.globl ret_from_fork
+ ret_from_fork:
+diff --git a/arch/hexagon/kernel/vm_vectors.S b/arch/hexagon/kernel/vm_vectors.S
+index 620f42c..aff4054 100644
+--- a/arch/hexagon/kernel/vm_vectors.S
++++ b/arch/hexagon/kernel/vm_vectors.S
+@@ -41,7 +41,7 @@ _K_VM_event_vector:
+ 	jump 1b;  /*  Reset  */
+ 	jump _K_enter_machcheck;
+ 	jump _K_enter_genex;
+-	jump 1b;  /*  3 Rsvd  */
++	jump _K_enter_debug;
+ 	jump 1b;  /*  4 Rsvd  */
+ 	jump _K_enter_trap0;
+ 	jump 1b;  /*  6 Rsvd  */
+-- 
+1.7.9.5
+
