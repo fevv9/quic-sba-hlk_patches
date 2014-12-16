@@ -1,0 +1,35 @@
+From 66202e2e6ee83be86fd49c9330b8f6abe76e090d Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 8 Apr 2014 19:00:45 -0500
+Subject: [PATCH 2/4] Hexagon: fix alignment of init_task in RW_DATA_SECTION
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/vmlinux.lds.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/kernel/vmlinux.lds.S b/arch/hexagon/kernel/vmlinux.lds.S
+index 44d8c47..5f268c1 100644
+--- a/arch/hexagon/kernel/vmlinux.lds.S
++++ b/arch/hexagon/kernel/vmlinux.lds.S
+@@ -1,7 +1,7 @@
+ /*
+  * Linker script for Hexagon kernel
+  *
+- * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -59,7 +59,7 @@ SECTIONS
+ 	INIT_DATA_SECTION(PAGE_SIZE)
+ 
+ 	_sdata = .;
+-		RW_DATA_SECTION(32,PAGE_SIZE,PAGE_SIZE)
++		RW_DATA_SECTION(32,PAGE_SIZE,_THREAD_SIZE)
+ 		RO_DATA_SECTION(PAGE_SIZE)
+ 	_edata = .;
+ 
+-- 
+1.7.12.1
+

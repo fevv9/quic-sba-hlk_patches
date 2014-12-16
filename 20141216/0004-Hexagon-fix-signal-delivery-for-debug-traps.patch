@@ -1,0 +1,35 @@
+From e75ded15f76954499c45cd2b7cea5a6f4d6e3afe Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 8 Dec 2014 15:36:20 -0600
+Subject: [PATCH 4/4] Hexagon:  fix signal delivery for debug traps
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/traps.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/kernel/traps.c b/arch/hexagon/kernel/traps.c
+index 7858663..110dab1 100644
+--- a/arch/hexagon/kernel/traps.c
++++ b/arch/hexagon/kernel/traps.c
+@@ -1,7 +1,7 @@
+ /*
+  * Kernel traps/events for Hexagon processor
+  *
+- * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -423,7 +423,7 @@ void do_trap0(struct pt_regs *regs)
+ 			 */
+ 			info.si_code = TRAP_BRKPT;
+ 			info.si_addr = (void __user *) pt_elr(regs);
+-			send_sig_info(SIGTRAP, &info, current);
++			force_sig_info(SIGTRAP, &info, current);
+ 		} else {
+ #ifdef CONFIG_KGDB
+ 			kgdb_handle_exception(pt_cause(regs), SIGTRAP,
+-- 
+1.7.12.1
+
