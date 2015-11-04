@@ -1,4 +1,4 @@
-From e75b1b277860918e7a30084ef987e2c04cce5f0b Mon Sep 17 00:00:00 2001
+From 2cc0183ee22b02fc5de45c40e30c9d3ca9239c8a Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Tue, 27 Oct 2015 12:27:32 -0500
 Subject: [PATCH 21/22] Hexagon: add hexagon_dma_init declaration to header

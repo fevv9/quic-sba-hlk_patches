@@ -1,4 +1,4 @@
-From f96a7ecece4d4f65140b5fb8d0e0f60b638833b8 Mon Sep 17 00:00:00 2001
+From 8a0d49e24ffc1e5b2b7e7562fec9ed322ae5740e Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Wed, 13 Jun 2012 13:39:39 -0500
 Subject: [PATCH 11/22] Hexagon: changes to support for hypervisor changes

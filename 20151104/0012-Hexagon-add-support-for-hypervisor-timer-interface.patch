@@ -1,4 +1,4 @@
-From 95c5f20c7cff8c80441050821770b2798dbc9180 Mon Sep 17 00:00:00 2001
+From 6441f8e174b3f062afa1a515f73854c634c23dbf Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Wed, 21 Oct 2015 16:06:11 -0500
 Subject: [PATCH 12/22] Hexagon: add support for hypervisor timer interface

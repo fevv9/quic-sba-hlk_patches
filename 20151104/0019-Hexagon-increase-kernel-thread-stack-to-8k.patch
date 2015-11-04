@@ -1,4 +1,4 @@
-From b384526903f531274e6843874e8e98cdff1a9007 Mon Sep 17 00:00:00 2001
+From af41403b81530638e6a1c3837a8ec94e1b910655 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Tue, 15 Apr 2014 15:07:29 -0500
 Subject: [PATCH 19/22] Hexagon: increase kernel/thread stack to 8k

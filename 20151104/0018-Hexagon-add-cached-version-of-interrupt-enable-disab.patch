@@ -1,4 +1,4 @@
-From 640e47534666f9b069a98ea54ec6c3246a9cc1eb Mon Sep 17 00:00:00 2001
+From 17ddb46a996dd0ba27234e0b88fdf965a3aedecb Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Fri, 23 Oct 2015 19:58:53 -0500
 Subject: [PATCH 18/22] Hexagon: add cached version of interrupt enable/disable

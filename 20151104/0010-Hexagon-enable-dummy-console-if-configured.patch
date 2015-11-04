@@ -1,4 +1,4 @@
-From 3c0eb6cd9e0438e0e9b6baafbb34e0446c25ab6f Mon Sep 17 00:00:00 2001
+From 8b04738d9fc3ed8fae1f7b4cf47bbf3e489f74e2 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Wed, 21 Oct 2015 13:57:53 -0500
 Subject: [PATCH 10/22] Hexagon: enable dummy console if configured

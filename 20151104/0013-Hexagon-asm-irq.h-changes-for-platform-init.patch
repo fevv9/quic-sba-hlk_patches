@@ -1,4 +1,4 @@
-From 008325b55f9b711895e49c6af6fc3155b3d4c75b Mon Sep 17 00:00:00 2001
+From 5321585f655fc9ecfe6b8f5c19951b47c143509d Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Thu, 22 Oct 2015 14:14:53 -0500
 Subject: [PATCH 13/22] Hexagon: asm/irq.h changes for platform init

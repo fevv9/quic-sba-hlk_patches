@@ -1,4 +1,4 @@
-From 9e542e2a0ae90a57e739c0d937e806685998532e Mon Sep 17 00:00:00 2001
+From ff396e15e89cf584d999104a5f72bc837017f83a Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Wed, 21 Oct 2015 12:28:17 -0500
 Subject: [PATCH 09/22] Hexagon: add machine description header

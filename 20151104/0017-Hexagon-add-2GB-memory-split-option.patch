@@ -1,4 +1,4 @@
-From 2df1cb5dab71d7c5bd227a82a4df08dd24e154fc Mon Sep 17 00:00:00 2001
+From b6c2c771248fc774d3c91116f1e75f2d70ec2463 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Fri, 23 Oct 2015 18:06:22 -0500
 Subject: [PATCH 17/22] Hexagon: add 2GB memory split option

@@ -1,4 +1,4 @@
-From 9a3e8f14b677ad662aaa03f3acd69f19d611b7c3 Mon Sep 17 00:00:00 2001
+From 3c45084a4c060d48adff99ea52059d8217348b78 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Mon, 26 Oct 2015 15:44:42 -0500
 Subject: [PATCH 20/22] Hexagon: switch to GENERIC_CALIBRATE_DELAY

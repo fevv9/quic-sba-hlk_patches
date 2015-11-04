@@ -1,4 +1,4 @@
-From a80cf4ca2a49d409bbb421dde885b0dc4f59979c Mon Sep 17 00:00:00 2001
+From 29fabeb2ac1df927761aad9e3fbfe77da863263e Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Tue, 20 Oct 2015 10:58:22 -0500
 Subject: [PATCH 07/22] Hexagon: add initial support files for MSM 8974

@@ -1,4 +1,4 @@
-From 557e0b4d0548a509b3e9369ca1c8f46735a21253 Mon Sep 17 00:00:00 2001
+From e36e257759951b0f304f74a86e1bce0498a985ed Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Tue, 20 Oct 2015 15:48:40 -0500
 Subject: [PATCH 08/22] Hexagon: syscall glue for mmap2

@@ -1,4 +1,4 @@
-From 1b2e1ab9da559a9eb30086c5e1877eb6a6524661 Mon Sep 17 00:00:00 2001
+From c6a4136aa9e1527962ff1c4b617cdf1714d1d198 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Thu, 22 Oct 2015 16:08:08 -0500
 Subject: [PATCH 14/22] Hexagon: irq cleanup and hypervisor changes
@@ -11,12 +11,12 @@ Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
  .../bindings/interrupt-controller/qcom,h2-pic.txt  | 18 +++++
  arch/hexagon/Kconfig                               |  1 +
  arch/hexagon/kernel/irq_cpu.c                      | 47 ++----------
- arch/hexagon/kernel/smp.c                          | 21 ++++-
+ arch/hexagon/kernel/smp.c                          | 21 +++++-
  arch/hexagon/kernel/vm_events.c                    |  8 +-
  drivers/irqchip/Kconfig                            |  4 +
  drivers/irqchip/Makefile                           |  1 +
- drivers/irqchip/irq-hexagon-h2.c                   | 89 ++++++++++++++++++++++
- 8 files changed, 141 insertions(+), 48 deletions(-)
+ drivers/irqchip/irq-hexagon-h2.c                   | 88 ++++++++++++++++++++++
+ 8 files changed, 140 insertions(+), 48 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/qcom,h2-pic.txt
  create mode 100644 drivers/irqchip/irq-hexagon-h2.c
 
@@ -256,10 +256,10 @@ index b8d4e96..99491c6 100644
 \ No newline at end of file
 diff --git a/drivers/irqchip/irq-hexagon-h2.c b/drivers/irqchip/irq-hexagon-h2.c
 new file mode 100644
-index 0000000..382460b
+index 0000000..05b77ef
 --- /dev/null
 +++ b/drivers/irqchip/irq-hexagon-h2.c
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,88 @@
 +/*
 + * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
 + *
@@ -348,7 +348,6 @@ index 0000000..382460b
 +}
 +
 +IRQCHIP_DECLARE(hexagon_h2_pic, "qcom,h2-pic", hexagon_pic_of_init);
-+
 -- 
 1.8.4.3
 

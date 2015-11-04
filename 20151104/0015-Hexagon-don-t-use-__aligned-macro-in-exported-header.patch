@@ -1,4 +1,4 @@
-From d65e0c861bb9099298f3d5c65fa3a0ed5e1f3b7e Mon Sep 17 00:00:00 2001
+From d02fe7b3bef953f5fdd123d9bfa634801e32049e Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Fri, 23 Oct 2015 13:37:48 -0500
 Subject: [PATCH 15/22] Hexagon: don't use __aligned macro in exported headers

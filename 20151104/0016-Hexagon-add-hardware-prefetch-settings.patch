@@ -1,4 +1,4 @@
-From 31fbed28463d542390400f2d523b366ad6655228 Mon Sep 17 00:00:00 2001
+From 2c7ba83c513cb941286a93c96603b388fc2d8b07 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Tue, 8 Oct 2013 16:08:06 -0500
 Subject: [PATCH 16/22] Hexagon: add hardware prefetch settings

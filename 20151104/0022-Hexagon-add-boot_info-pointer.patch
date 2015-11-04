@@ -1,4 +1,4 @@
-From 076ef59840e88c6078e40be21fa99553f9d46066 Mon Sep 17 00:00:00 2001
+From 85513d5875f551a9a68e51719aaa9d5554a0f541 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Tue, 27 Oct 2015 15:21:26 -0500
 Subject: [PATCH 22/22] Hexagon: add boot_info pointer

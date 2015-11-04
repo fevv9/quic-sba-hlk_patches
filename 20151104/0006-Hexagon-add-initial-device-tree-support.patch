@@ -1,4 +1,4 @@
-From ceaea4c890dccda2d1aff49ca781e39a464e08db Mon Sep 17 00:00:00 2001
+From 7703863220926dd9f520ad7c60297cf43a950b79 Mon Sep 17 00:00:00 2001
 From: Richard Kuo <rkuo@codeaurora.org>
 Date: Tue, 20 Oct 2015 14:36:06 -0500
 Subject: [PATCH 06/22] Hexagon: add initial device tree support
@@ -12,12 +12,12 @@ Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
  arch/hexagon/Kconfig                | 11 +++++
  arch/hexagon/Makefile               |  9 ++++
  arch/hexagon/include/asm/platform.h | 25 +++++++++++
- arch/hexagon/include/asm/prom.h     | 29 ++++++++++++
+ arch/hexagon/include/asm/prom.h     | 28 ++++++++++++
  arch/hexagon/kernel/Makefile        |  1 +
  arch/hexagon/kernel/devtree.c       | 88 +++++++++++++++++++++++++++++++++++++
  arch/hexagon/kernel/head.S          |  4 +-
  arch/hexagon/kernel/setup.c         | 17 ++++++-
- 8 files changed, 180 insertions(+), 4 deletions(-)
+ 8 files changed, 179 insertions(+), 4 deletions(-)
  create mode 100644 arch/hexagon/include/asm/platform.h
  create mode 100644 arch/hexagon/include/asm/prom.h
  create mode 100644 arch/hexagon/kernel/devtree.c
@@ -95,10 +95,10 @@ index 0000000..864138c
 +#endif
 diff --git a/arch/hexagon/include/asm/prom.h b/arch/hexagon/include/asm/prom.h
 new file mode 100644
-index 0000000..27ca988
+index 0000000..96b0aa9
 --- /dev/null
 +++ b/arch/hexagon/include/asm/prom.h
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,28 @@
 +/*
 + * Copyright (c) 2012,2015, The Linux Foundation. All rights reserved.
 + *
@@ -127,7 +127,6 @@ index 0000000..27ca988
 +#endif
 +
 +#endif /* __ASM_PROM_H */
-+
 diff --git a/arch/hexagon/kernel/Makefile b/arch/hexagon/kernel/Makefile
 index 009228b..f666100 100644
 --- a/arch/hexagon/kernel/Makefile
