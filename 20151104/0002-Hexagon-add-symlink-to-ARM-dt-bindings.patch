@@ -1,0 +1,24 @@
+From 1114e210ef890e5af9c526e4d6791299e40a323e Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 20 Oct 2015 10:56:50 -0500
+Subject: [PATCH 02/22] Hexagon: add symlink to ARM dt-bindings
+
+We're borrowing ARM's dt-bindings for some stuff.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/boot/dts/include/dt-bindings | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 120000 arch/hexagon/boot/dts/include/dt-bindings
+
+diff --git a/arch/hexagon/boot/dts/include/dt-bindings b/arch/hexagon/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..08c00e4
+--- /dev/null
++++ b/arch/hexagon/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings
+\ No newline at end of file
+-- 
+1.8.4.3
+

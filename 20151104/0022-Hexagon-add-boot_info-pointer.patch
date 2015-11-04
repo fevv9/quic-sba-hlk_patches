@@ -1,0 +1,64 @@
+From 076ef59840e88c6078e40be21fa99553f9d46066 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 27 Oct 2015 15:21:26 -0500
+Subject: [PATCH 22/22] Hexagon: add boot_info pointer
+
+Tenatively the one pointer that is passed in to R0 at boot
+time.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/head.S  | 9 ++++++++-
+ arch/hexagon/kernel/setup.c | 2 ++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/arch/hexagon/kernel/head.S b/arch/hexagon/kernel/head.S
+index 5e8835f..3ecb4817 100644
+--- a/arch/hexagon/kernel/head.S
++++ b/arch/hexagon/kernel/head.S
+@@ -34,6 +34,9 @@
+ #endif
+ 	__INIT
+ ENTRY(stext)
++	nop
++	nop
++	R27 = R0  /*  Bootloader hands us one value in R0  */
+ 	/*
+ 	 * VMM will already have set up true vector page, MMU, etc.
+ 	 * To set up initial kernel identity map, we have to pass
+@@ -231,6 +234,10 @@ __head_s_vaddr_target:
+ 	r2 = sub(r2,r0);
+ 	call memset;
+ 
++	R0.H = #HI(boot_info);
++	R0.L = #LO(boot_info);
++	memw(R0) = R27;  //  save the boot info pointer
++
+ 	/*  Set PHYS_OFFSET; should be in R25 */
+ #ifdef CONFIG_HEXAGON_PHYS_OFFSET
+ 	r0.l = #LO(__phys_offset);
+@@ -249,7 +256,7 @@ __head_s_vaddr_target:
+ 
+ .p2align 12
+ ENTRY(external_buffer)
+-        .fill _PAGE_SIZE,1,0
++	.fill _PAGE_SIZE,1,0
+ 
+ .data
+ .p2align PAGE_SHIFT
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index 1ad2566..7a946d7 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -41,6 +41,8 @@ unsigned long vmversion;
+ char cmd_line[COMMAND_LINE_SIZE];
+ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+ 
++void *boot_info;
++
+ struct machine_desc *mdesc;
+ 
+ /*
+-- 
+1.8.4.3
+

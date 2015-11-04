@@ -1,0 +1,354 @@
+From 1b2e1ab9da559a9eb30086c5e1877eb6a6524661 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 22 Oct 2015 16:08:08 -0500
+Subject: [PATCH 14/22] Hexagon: irq cleanup and hypervisor changes
+
+Move the irq code to irqchip, switch to use irqdomains, and add some
+hypervisor related changes for initializing and posting interrupts.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ .../bindings/interrupt-controller/qcom,h2-pic.txt  | 18 +++++
+ arch/hexagon/Kconfig                               |  1 +
+ arch/hexagon/kernel/irq_cpu.c                      | 47 ++----------
+ arch/hexagon/kernel/smp.c                          | 21 ++++-
+ arch/hexagon/kernel/vm_events.c                    |  8 +-
+ drivers/irqchip/Kconfig                            |  4 +
+ drivers/irqchip/Makefile                           |  1 +
+ drivers/irqchip/irq-hexagon-h2.c                   | 89 ++++++++++++++++++++++
+ 8 files changed, 141 insertions(+), 48 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/qcom,h2-pic.txt
+ create mode 100644 drivers/irqchip/irq-hexagon-h2.c
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/qcom,h2-pic.txt b/Documentation/devicetree/bindings/interrupt-controller/qcom,h2-pic.txt
+new file mode 100644
+index 0000000..0ae7a01
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/qcom,h2-pic.txt
+@@ -0,0 +1,18 @@
++Qualcomm Technologies, Inc. Hexagon Hypervisor Virtual Interrupt Controller
++
++This is the virtual interrupt controller presented to the guest by the
++hypervisor.
++
++Required Properties:
++- compatible: must be "qcom,h2-pic"
++- interrupt-controller: node is an interrupt controller
++- #interrupt-cells: number of cells needed to describe interrupt source
++
++
++Example:
++
++	interrupt-controller {
++		compatible = "qcom,h2-pic";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 6dcb7c4..8879aa8 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -28,6 +28,7 @@ config HEXAGON
+ 	select MODULES_USE_ELF_RELA
+ 	select GENERIC_CPU_DEVICES
+ 	select HAVE_DMA_ATTRS
++	select IRQ_DOMAIN
+ 	---help---
+ 	  Qualcomm Hexagon is a processor architecture designed for high
+ 	  performance and low power across a wide variety of applications.
+diff --git a/arch/hexagon/kernel/irq_cpu.c b/arch/hexagon/kernel/irq_cpu.c
+index 85883e1..bc1a72a 100644
+--- a/arch/hexagon/kernel/irq_cpu.c
++++ b/arch/hexagon/kernel/irq_cpu.c
+@@ -19,6 +19,10 @@
+  */
+ 
+ #include <linux/interrupt.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
+ #include <asm/irq.h>
+ #include <asm/hexagon_vm.h>
+ 
+@@ -43,48 +47,7 @@ static void eoi_irq(struct irq_data *data)
+ 	__vmintop_globen((long) data->irq);
+ }
+ 
+-/* Power mamangement wake call. We don't need this, however,
+- * if this is absent, then an -ENXIO error is returned to the
+- * msm_serial driver, and it fails to correctly initialize.
+- * This is a bug in the msm_serial driver, but, for now, we
+- * work around it here, by providing this bogus handler.
+- * XXX FIXME!!! remove this when msm_serial is fixed.
+- */
+-static int set_wake(struct irq_data *data, unsigned int on)
+-{
+-	return 0;
+-}
+-
+-static struct irq_chip hexagon_irq_chip = {
+-	.name		= "HEXAGON",
+-	.irq_mask	= mask_irq,
+-	.irq_unmask	= unmask_irq,
+-	.irq_set_wake	= set_wake,
+-	.irq_eoi	= eoi_irq
+-};
+-
+-/**
+- * The hexagon core comes with a first-level interrupt controller
+- * with 32 total possible interrupts.  When the core is embedded
+- * into different systems/platforms, it is typically wrapped by
+- * macro cells that provide one or more second-level interrupt
+- * controllers that are cascaded into one or more of the first-level
+- * interrupts handled here. The precise wiring of these other
+- * irqs varies from platform to platform, and are set up & configured
+- * in the platform-specific files.
+- *
+- * The first-level interrupt controller is wrapped by the VM, which
+- * virtualizes the interrupt controller for us.  It provides a very
+- * simple, fast & efficient API, and so the fasteoi handler is
+- * appropriate for this case.
+- */
+ void __init init_IRQ(void)
+ {
+-	int irq;
+-
+-	for (irq = 0; irq < HEXAGON_CPUINTS; irq++) {
+-		mask_irq_num(irq);
+-		irq_set_chip_and_handler(irq, &hexagon_irq_chip,
+-						 handle_fasteoi_irq);
+-	}
++	irqchip_init();
+ }
+diff --git a/arch/hexagon/kernel/smp.c b/arch/hexagon/kernel/smp.c
+index 980deb4..5baa8ca 100644
+--- a/arch/hexagon/kernel/smp.c
++++ b/arch/hexagon/kernel/smp.c
+@@ -1,7 +1,7 @@
+ /*
+  * SMP support for Hexagon
+  *
+- * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013,2015 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -29,11 +29,13 @@
+ #include <linux/smp.h>
+ #include <linux/spinlock.h>
+ #include <linux/cpu.h>
++#include <linux/irqdomain.h>
+ 
+ #include <asm/time.h>    /*  timer_interrupt  */
+ #include <asm/hexagon_vm.h>
+ 
+ #define BASE_IPI_IRQ 26
++DEFINE_PER_CPU(u32, ipi_irq);
+ 
+ /*  Virtual Processor ID storage  */
+ DEFINE_PER_CPU(u32, vpid);
+@@ -150,6 +152,7 @@ void __init smp_prepare_boot_cpu(void)
+ void start_secondary(void)
+ {
+ 	unsigned int cpu;
++	int irq;
+ 	unsigned long thread_ptr;
+ 
+ 	/*  Calculate thread_info pointer from stack pointer  */
+@@ -176,7 +179,12 @@ void start_secondary(void)
+ 
+ 	cpu = smp_processor_id();
+ 
+-	setup_irq(BASE_IPI_IRQ + cpu, &ipi_intdesc);
++	for (irq = 0; irq < HEXAGON_CPUINTS; irq++)
++		__vmintop_locdis(irq);
++
++	per_cpu(ipi_irq, cpu) = irq_find_mapping(NULL, BASE_IPI_IRQ+cpu);
++	__vmintop_globen(BASE_IPI_IRQ+cpu);
++	setup_irq(per_cpu(ipi_irq, cpu), &ipi_intdesc);
+ 
+ 	/*  Register the clock_event dummy  */
+ 	setup_percpu_clockdev();
+@@ -222,6 +230,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_cpus(unsigned int max_cpus)
+ {
++	int cpu = 0;
+ 	int i;
+ 
+ 	/*
+@@ -234,8 +243,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		set_cpu_present(i, true);
+ 
+ 	/*  Also need to register the interrupts for IPI  */
+-	if (max_cpus > 1)
+-		setup_irq(BASE_IPI_IRQ, &ipi_intdesc);
++	if (max_cpus > 1) {
++		per_cpu(ipi_irq, cpu) = irq_find_mapping(NULL,
++			BASE_IPI_IRQ+cpu);
++		__vmintop_globen(BASE_IPI_IRQ+cpu);
++		setup_irq(per_cpu(ipi_irq, cpu), &ipi_intdesc);
++	}
+ 
+ 	per_cpu(vpid, smp_processor_id()) = __vmvpid();
+ 
+diff --git a/arch/hexagon/kernel/vm_events.c b/arch/hexagon/kernel/vm_events.c
+index 741aaa9..4b22001 100644
+--- a/arch/hexagon/kernel/vm_events.c
++++ b/arch/hexagon/kernel/vm_events.c
+@@ -1,7 +1,7 @@
+ /*
+  * Mostly IRQ support for Hexagon
+  *
+- * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -22,6 +22,7 @@
+ #include <asm/registers.h>
+ #include <linux/irq.h>
+ #include <linux/hardirq.h>
++#include <linux/irqdomain.h>
+ 
+ /*
+  * show_regs - print pt_regs structure
+@@ -95,10 +96,13 @@ void dummy_handler(struct pt_regs *regs)
+ void arch_do_IRQ(struct pt_regs *regs)
+ {
+ 	int irq = pt_cause(regs);
++	int virq;
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
+ 	irq_enter();
+-	generic_handle_irq(irq);
++	/*  return of zero here is an error btw  */
++	virq = irq_find_mapping(NULL, irq);
++	generic_handle_irq(virq);
+ 	irq_exit();
+ 	set_irq_regs(old_regs);
+ }
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 120d815..d7a86ff 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -81,6 +81,10 @@ config DW_APB_ICTL
+ 	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
+ 
++config HEXAGON_H2_PIC
++	bool
++	select IRQ_DOMAIN
++
+ config IMGPDC_IRQ
+ 	bool
+ 	select GENERIC_IRQ_CHIP
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index b8d4e96..99491c6 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -52,3 +52,4 @@ obj-$(CONFIG_RENESAS_H8300H_INTC)	+= irq-renesas-h8300h.o
+ obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
+ obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
+ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
++obj-$(CONFIG_HEXAGON_H2_PIC)		+= irq-hexagon-h2.o
+\ No newline at end of file
+diff --git a/drivers/irqchip/irq-hexagon-h2.c b/drivers/irqchip/irq-hexagon-h2.c
+new file mode 100644
+index 0000000..382460b
+--- /dev/null
++++ b/drivers/irqchip/irq-hexagon-h2.c
+@@ -0,0 +1,89 @@
++/*
++ * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/percpu.h>
++#include <asm/irq.h>
++#include <asm/hexagon_vm.h>
++
++#include "irqchip.h"
++
++static void mask_irq_num(unsigned int hwirq)
++{
++	__vmintop_locdis((long) hwirq);
++}
++
++static void mask_irq(struct irq_data *data)
++{
++	mask_irq_num(data->hwirq);
++}
++
++static void unmask_irq(struct irq_data *data)
++{
++	__vmintop_locen((long) data->hwirq);
++}
++
++static void eoi_irq(struct irq_data *data)
++{
++	__vmintop_globen((long) data->hwirq);
++}
++
++static struct irq_chip hexagon_irq_chip = {
++	.name		= "HEXAGON",
++	.irq_mask	= mask_irq,
++	.irq_unmask	= unmask_irq,
++	.irq_eoi	= eoi_irq
++};
++
++struct irq_domain *hexagon_irq_domain;
++
++int __init hexagon_pic_of_init(struct device_node *node,
++			  struct device_node *parent)
++{
++	int irq;	/*  "hardware" IRQ's  */
++	int virq;	/*  linux IRQ's  */
++
++	hexagon_irq_domain = irq_domain_add_linear(node, HEXAGON_CPUINTS,
++			&irq_domain_simple_ops, &hexagon_irq_chip);
++
++
++	if (!hexagon_irq_domain) {
++		WARN(1, "Cannot allocate irq_domain\n");
++		return -ENOMEM;
++	}
++
++	irq_set_default_host(hexagon_irq_domain);
++
++	/**
++	 * The first-level interrupt controller is wrapped by the VM, which
++	 * virtualizes the interrupt controller for us.  It provides a very
++	 * simple, fast & efficient API, and so the fasteoi handler is
++	 * appropriate for this case.
++	 */
++
++	for (irq = 0; irq < HEXAGON_CPUINTS; irq++) {
++		mask_irq_num(irq);
++		__vmintop_globen((long) irq);
++		virq = irq_create_mapping(hexagon_irq_domain, irq);
++		irq_set_chip_and_handler(virq, &hexagon_irq_chip,
++						 handle_fasteoi_irq);
++	}
++
++	return 0;
++}
++
++IRQCHIP_DECLARE(hexagon_h2_pic, "qcom,h2-pic", hexagon_pic_of_init);
++
+-- 
+1.8.4.3
+

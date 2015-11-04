@@ -1,0 +1,312 @@
+From ceaea4c890dccda2d1aff49ca781e39a464e08db Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 20 Oct 2015 14:36:06 -0500
+Subject: [PATCH 06/22] Hexagon: add initial device tree support
+
+Add files and changes for initial device tree support.  Also changed
+the name and alignment of the buffer space that we put in head.S which
+was previously used for command line args.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig                | 11 +++++
+ arch/hexagon/Makefile               |  9 ++++
+ arch/hexagon/include/asm/platform.h | 25 +++++++++++
+ arch/hexagon/include/asm/prom.h     | 29 ++++++++++++
+ arch/hexagon/kernel/Makefile        |  1 +
+ arch/hexagon/kernel/devtree.c       | 88 +++++++++++++++++++++++++++++++++++++
+ arch/hexagon/kernel/head.S          |  4 +-
+ arch/hexagon/kernel/setup.c         | 17 ++++++-
+ 8 files changed, 180 insertions(+), 4 deletions(-)
+ create mode 100644 arch/hexagon/include/asm/platform.h
+ create mode 100644 arch/hexagon/include/asm/prom.h
+ create mode 100644 arch/hexagon/kernel/devtree.c
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 4dc89d1..63478c1 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -101,6 +101,17 @@ config HEXAGON_ARCH_VERSION
+ 	int "Architecture version"
+ 	default 2
+ 
++config USE_OF
++	default n
++	bool "Device Tree support"
++	select OF
++	select OF_EARLY_FLATTREE
++
++config DTB_BUILTIN
++	def_bool y
++	help
++	  Temporary bringup option; assumes DTB is built into kernel somewhere.
++
+ config CMDLINE
+ 	string "Default kernel command string"
+ 	default ""
+diff --git a/arch/hexagon/Makefile b/arch/hexagon/Makefile
+index 207711a0..f62b74e 100644
+--- a/arch/hexagon/Makefile
++++ b/arch/hexagon/Makefile
+@@ -39,3 +39,12 @@ head-y := arch/hexagon/kernel/head.o
+ core-y += arch/hexagon/kernel/ \
+ 	arch/hexagon/mm/ \
+ 	arch/hexagon/lib/
++
++
++#  Devtree blob targets
++boot := arch/hexagon/boot
++core-$(CONFIG_DTB_BUILTIN) += arch/hexagon/boot/dts/
++
++PHONY += dtbs
++dtbs: scripts
++	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
+\ No newline at end of file
+diff --git a/arch/hexagon/include/asm/platform.h b/arch/hexagon/include/asm/platform.h
+new file mode 100644
+index 0000000..864138c
+--- /dev/null
++++ b/arch/hexagon/include/asm/platform.h
+@@ -0,0 +1,25 @@
++/*
++ * Platform support for the Hexagon architecture
++ *
++ * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
++ *
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __PLATFORM_H
++#define __PLATFORM_H
++
++#include <asm/mach_desc.h>
++
++extern unsigned long bootmem_lastpg;
++extern u32 dt_blob_start;
++
++#endif
+diff --git a/arch/hexagon/include/asm/prom.h b/arch/hexagon/include/asm/prom.h
+new file mode 100644
+index 0000000..27ca988
+--- /dev/null
++++ b/arch/hexagon/include/asm/prom.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) 2012,2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ASM_PROM_H
++#define __ASM_PROM_H
++
++#include <asm/setup.h>
++
++#ifdef CONFIG_OF_FLATTREE
++extern struct machine_desc *setup_machine_fdt(void *dt_phys);
++#else
++static inline struct machine_desc *setup_machine_fdt(void *dt_phys)
++{
++	return NULL;
++}
++#endif
++
++#endif /* __ASM_PROM_H */
++
+diff --git a/arch/hexagon/kernel/Makefile b/arch/hexagon/kernel/Makefile
+index 009228b..f666100 100644
+--- a/arch/hexagon/kernel/Makefile
++++ b/arch/hexagon/kernel/Makefile
+@@ -17,3 +17,4 @@ obj-$(CONFIG_HAS_DMA) += dma.o
+ obj-$(CONFIG_STACKTRACE) += stacktrace.o
+ 
+ obj-$(CONFIG_VGA_CONSOLE) += screen_info.o
++obj-$(CONFIG_OF) += devtree.o
+diff --git a/arch/hexagon/kernel/devtree.c b/arch/hexagon/kernel/devtree.c
+new file mode 100644
+index 0000000..91ae94c
+--- /dev/null
++++ b/arch/hexagon/kernel/devtree.c
+@@ -0,0 +1,88 @@
++/*
++ * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/libfdt.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/bootmem.h>
++#include <linux/initrd.h>
++#include <asm/platform.h>
++#include <asm/prom.h>
++
++void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
++{
++	return alloc_bootmem_align(size, align);
++}
++
++#ifdef CONFIG_BLK_DEV_INITRD
++void __init early_init_dt_setup_initrd_arch(u64 start,
++					    u64 end)
++{
++	initrd_start = (unsigned long)__va(start);
++	initrd_end = (unsigned long)__va(end);
++	initrd_below_start_ok = 1;
++}
++#endif
++
++/*
++ * setup_machine_fdt - set up machine based on dtb passed to kernel
++ * @dt_phys: physical address of dtb
++ *
++ * Sets up some of the earliest stuff -- setting the machine type,
++ * pulling the command line options, and finding the memory.
++ *
++ * Since we're calling this from setup_arch, this is going to happen
++ * very, very early.
++ */
++struct machine_desc * __init setup_machine_fdt(void *dt_phys)
++{
++	struct machine_desc *mdesc, *mdesc_best = NULL;
++	unsigned int score, mdesc_score = ~1;
++	unsigned long dt_root;
++
++#ifdef CONFIG_DTB_BUILTIN
++	initial_boot_params = dt_phys;
++#else
++	initial_boot_params = phys_to_virt(dt_phys);
++#endif
++
++	/* check device tree validity */
++	if (fdt_magic(initial_boot_params) != OF_DT_HEADER)
++		return NULL;
++
++	dt_root = of_get_flat_dt_root();
++
++	for_each_machine_desc(mdesc) {
++		score = of_flat_dt_match(dt_root, mdesc->dt_compat);
++		if (score > 0 && score < mdesc_score) {
++			mdesc_best = mdesc;
++			mdesc_score = score;
++		}
++	}
++
++	if (!mdesc_best)
++		panic("Unrecognized device tree\n");
++
++	/*
++	 * Sets the top level address and size cells which are stored
++	 * in globals by the devtree infrastructure.
++	*/
++	of_scan_flat_dt(early_init_dt_scan_root, NULL);
++
++	/*  Retrieve various information from the /chosen node  */
++	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
++
++	/*  Todo:  Setup memory  */
++	return mdesc_best;
++}
+diff --git a/arch/hexagon/kernel/head.S b/arch/hexagon/kernel/head.S
+index b9b63d0..320dfc5 100644
+--- a/arch/hexagon/kernel/head.S
++++ b/arch/hexagon/kernel/head.S
+@@ -227,8 +227,8 @@ __head_s_vaddr_target:
+ 1:
+ 	jump 1b
+ 
+-.p2align PAGE_SHIFT
+-ENTRY(external_cmdline_buffer)
++.p2align 12
++ENTRY(external_buffer)
+         .fill _PAGE_SIZE,1,0
+ 
+ .data
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index dae04cf..fc552d1 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -1,7 +1,7 @@
+ /*
+  * Arch related setup for Hexagon
+  *
+- * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -32,11 +32,15 @@
+ #include <asm/processor.h>
+ #include <asm/hexagon_vm.h>
+ #include <asm/vm_mmu.h>
++#include <asm/platform.h>
++#include <asm/prom.h>
+ #include <asm/time.h>
+ 
+ char cmd_line[COMMAND_LINE_SIZE];
+ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+ 
++struct machine_desc *mdesc;
++
+ void calibrate_delay(void)
+ {
+ 	loops_per_jiffy = thread_freq_mhz * 1000000 / HZ;
+@@ -49,7 +53,8 @@ void calibrate_delay(void)
+ 
+ void __init setup_arch(char **cmdline_p)
+ {
+-	char *p = &external_cmdline_buffer;
++	char *p = &external_buffer;
++	void *dtb = &__dtb_start;
+ 
+ 	/*
+ 	 * These will eventually be pulled in via either some hypervisor
+@@ -65,6 +70,11 @@ void __init setup_arch(char **cmdline_p)
+ 	__vmsetvec(_K_VM_event_vector);
+ 
+ 	printk(KERN_INFO "PHYS_OFFSET=0x%08x\n", PHYS_OFFSET);
++	/*  initial machine setup from flattened device tree  */
++	mdesc = setup_machine_fdt(dtb);
++
++	if (mdesc->setup_arch_machine)
++		mdesc->setup_arch_machine();
+ 
+ 	if (p[0] != '\0')
+ 		strlcpy(boot_command_line, p, COMMAND_LINE_SIZE);
+@@ -84,6 +94,9 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	setup_arch_memory();
+ 
++	/*  Now is time we unflatten devicetree  */
++	unflatten_device_tree();
++
+ #ifdef CONFIG_SMP
+ 	smp_start_cpus();
+ #endif
+-- 
+1.8.4.3
+

@@ -1,0 +1,45 @@
+From 52ce3191d3a66fbde98777d341618ef603acce38 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Fri, 9 Jan 2015 14:12:15 -0600
+Subject: [PATCH 04/22] Hexagon: increase ARCH_DMA_MINALIGN
+
+With hardware prefetches turned on, it's possible for a much larger
+line to be pulled in and corrupt a DMA transfer.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/cache.h | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/cache.h b/arch/hexagon/include/asm/cache.h
+index 69952c1..3d506f7 100644
+--- a/arch/hexagon/include/asm/cache.h
++++ b/arch/hexagon/include/asm/cache.h
+@@ -1,7 +1,7 @@
+ /*
+  * Cache definitions for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011,2014 The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2014-2015, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -21,11 +21,14 @@
+ #ifndef __ASM_CACHE_H
+ #define __ASM_CACHE_H
+ 
++
++#define L2_PREFETCH_BYTES	(128)
++
+ /* Bytes per L1 cache line */
+ #define L1_CACHE_SHIFT		(5)
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+ 
+-#define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
++#define ARCH_DMA_MINALIGN	L2_PREFETCH_BYTES
+ 
+ #define __cacheline_aligned	__aligned(L1_CACHE_BYTES)
+ #define ____cacheline_aligned	__aligned(L1_CACHE_BYTES)
+-- 
+1.8.4.3
+

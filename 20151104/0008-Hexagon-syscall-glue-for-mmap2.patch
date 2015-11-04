@@ -1,0 +1,108 @@
+From 557e0b4d0548a509b3e9369ca1c8f46735a21253 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 20 Oct 2015 15:48:40 -0500
+Subject: [PATCH 08/22] Hexagon: syscall glue for mmap2
+
+Newer libc implementation passes offset in 4k chunks instead of
+using PAGE_SIZE.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/uapi/asm/unistd.h |  3 +--
+ arch/hexagon/kernel/Makefile           |  2 +-
+ arch/hexagon/kernel/syscall.c          | 49 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+), 3 deletions(-)
+ create mode 100644 arch/hexagon/kernel/syscall.c
+
+diff --git a/arch/hexagon/include/uapi/asm/unistd.h b/arch/hexagon/include/uapi/asm/unistd.h
+index ffee405..37b14e3 100644
+--- a/arch/hexagon/include/uapi/asm/unistd.h
++++ b/arch/hexagon/include/uapi/asm/unistd.h
+@@ -1,7 +1,7 @@
+ /*
+  * Syscall support for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2014, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -26,7 +26,6 @@
+  *  See also:  syscalltab.c
+  */
+ 
+-#define sys_mmap2 sys_mmap_pgoff
+ #define __ARCH_WANT_SYS_EXECVE
+ #define __ARCH_WANT_SYS_CLONE
+ #define __ARCH_WANT_SYS_VFORK
+diff --git a/arch/hexagon/kernel/Makefile b/arch/hexagon/kernel/Makefile
+index f666100..0523990 100644
+--- a/arch/hexagon/kernel/Makefile
++++ b/arch/hexagon/kernel/Makefile
+@@ -3,7 +3,7 @@ extra-y := head.o vmlinux.lds
+ obj-$(CONFIG_SMP) += smp.o
+ 
+ obj-y += setup.o irq_cpu.o traps.o syscalltab.o signal.o time.o
+-obj-y += process.o trampoline.o reset.o ptrace.o vdso.o
++obj-y += process.o syscall.o trampoline.o reset.o ptrace.o vdso.o
+ 
+ obj-$(CONFIG_KGDB)    += kgdb.o
+ obj-$(CONFIG_MODULES) += module.o hexagon_ksyms.o
+diff --git a/arch/hexagon/kernel/syscall.c b/arch/hexagon/kernel/syscall.c
+new file mode 100644
+index 0000000..01b0ed0
+--- /dev/null
++++ b/arch/hexagon/kernel/syscall.c
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/file.h>
++#include <linux/fs.h>
++#include <linux/linkage.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/syscalls.h>
++#include <linux/unistd.h>
++#include <asm/mman.h>
++#include <asm/registers.h>
++
++unsigned long straight_mmap2;
++
++asmlinkage long sys_mmap2(unsigned long addr, size_t len,
++			unsigned long prot, unsigned long flags,
++			unsigned long fd, unsigned long pgoff)
++{
++	long ret = -EINVAL;
++
++	if (!straight_mmap2)
++		pgoff >>= PAGE_SHIFT-12;
++
++	ret = sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
++
++	return ret;
++}
++
++
++static int __init use_straight_mmap2(char *str)
++{
++	straight_mmap2 = 1;
++	return 0;
++}
++
++early_param("use_straight_mmap2", use_straight_mmap2);
+-- 
+1.8.4.3
+

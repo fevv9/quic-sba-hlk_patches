@@ -1,0 +1,47 @@
+From 9a3e8f14b677ad662aaa03f3acd69f19d611b7c3 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 26 Oct 2015 15:44:42 -0500
+Subject: [PATCH 20/22] Hexagon: switch to GENERIC_CALIBRATE_DELAY
+
+Previous version of calibrate_delay was a little dependent
+on hardcoding; revert to just using the generic version.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig        | 3 +++
+ arch/hexagon/kernel/setup.c | 5 -----
+ 2 files changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index f66ed22..82c1902 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -59,6 +59,9 @@ config TRACE_IRQFLAGS_SUPPORT
+ config GENERIC_CSUM
+ 	def_bool y
+ 
++config GENERIC_CALIBRATE_DELAY
++	def_bool y
++
+ config HEXAGON_SPLIT_2GB
+ 	def_bool n
+ 	---help---
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index 03ba063..1ad2566 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -43,11 +43,6 @@ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+ 
+ struct machine_desc *mdesc;
+ 
+-void calibrate_delay(void)
+-{
+-	loops_per_jiffy = thread_freq_mhz * 1000000 / HZ;
+-}
+-
+ /*
+  * setup_arch -  high level architectural setup routine
+  * @cmdline_p: pointer to pointer to command-line arguments
+-- 
+1.8.4.3
+

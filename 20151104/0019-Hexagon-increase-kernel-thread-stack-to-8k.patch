@@ -1,0 +1,38 @@
+From b384526903f531274e6843874e8e98cdff1a9007 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 15 Apr 2014 15:07:29 -0500
+Subject: [PATCH 19/22] Hexagon: increase kernel/thread stack to 8k
+
+Turning on certain drivers seemed to increase stack usage past
+the original 4k allocation.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/thread_info.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/thread_info.h b/arch/hexagon/include/asm/thread_info.h
+index b80fe1d..3b41200 100644
+--- a/arch/hexagon/include/asm/thread_info.h
++++ b/arch/hexagon/include/asm/thread_info.h
+@@ -1,7 +1,7 @@
+ /*
+  * Thread support for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2013-2014, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -29,7 +29,7 @@
+ #include <asm/page.h>
+ #endif
+ 
+-#define THREAD_SHIFT		12
++#define THREAD_SHIFT		13
+ #define THREAD_SIZE		(1<<THREAD_SHIFT)
+ #define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
+ 
+-- 
+1.8.4.3
+

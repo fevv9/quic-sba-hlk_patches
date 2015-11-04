@@ -1,0 +1,356 @@
+From a80cf4ca2a49d409bbb421dde885b0dc4f59979c Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 20 Oct 2015 10:58:22 -0500
+Subject: [PATCH 07/22] Hexagon: add initial support files for MSM 8974
+
+This patch adds most of the initial stuff for running
+Hexagon Linux on MSM 8974 platforms.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig                   |  14 +++-
+ arch/hexagon/Makefile                  |   5 +-
+ arch/hexagon/boot/dts/Makefile         |  10 +++
+ arch/hexagon/boot/dts/msm8974.dts      | 146 +++++++++++++++++++++++++++++++++
+ arch/hexagon/configs/msm8974_defconfig |  28 +++++++
+ arch/hexagon/platform/msm8974/Kconfig  |   1 +
+ arch/hexagon/platform/msm8974/Makefile |   1 +
+ arch/hexagon/platform/msm8974/board.c  |  53 ++++++++++++
+ 8 files changed, 255 insertions(+), 3 deletions(-)
+ create mode 100644 arch/hexagon/boot/dts/Makefile
+ create mode 100644 arch/hexagon/boot/dts/msm8974.dts
+ create mode 100644 arch/hexagon/configs/msm8974_defconfig
+ create mode 100644 arch/hexagon/platform/msm8974/Kconfig
+ create mode 100644 arch/hexagon/platform/msm8974/Makefile
+ create mode 100644 arch/hexagon/platform/msm8974/board.c
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 63478c1..6dcb7c4 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -88,7 +88,19 @@ menu "Machine selection"
+ 
+ choice
+ 	prompt "System type"
+-	default HEXAGON_COMET
++	default HEXAGON_MSM8974
++
++config HEXAGON_MSM8974
++	bool "MSM8974"
++	select HEXAGON_PHYS_OFFSET
++	select HAVE_DMA_ATTRS
++	select ARCH_REQUIRE_GPIOLIB
++	select GENERIC_GPIO
++	select HEXAGON_SPLIT_2GB
++	select COMMON_CLK
++	select HEXAGON_H2_PIC
++	---help---
++	  Enable support for MSM8974 devices.
+ 
+ config HEXAGON_COMET
+ 	bool "Comet Board"
+diff --git a/arch/hexagon/Makefile b/arch/hexagon/Makefile
+index f62b74e..a7a104e 100644
+--- a/arch/hexagon/Makefile
++++ b/arch/hexagon/Makefile
+@@ -1,6 +1,6 @@
+ #  Makefile for the Hexagon arch
+ 
+-KBUILD_DEFCONFIG = comet_defconfig
++KBUILD_DEFCONFIG = msm8974_defconfig
+ 
+ # Do not use GP-relative jumps
+ KBUILD_CFLAGS += -G0
+@@ -40,6 +40,7 @@ core-y += arch/hexagon/kernel/ \
+ 	arch/hexagon/mm/ \
+ 	arch/hexagon/lib/
+ 
++core-$(CONFIG_HEXAGON_MSM8974)	+= arch/hexagon/platform/msm8974/
+ 
+ #  Devtree blob targets
+ boot := arch/hexagon/boot
+@@ -47,4 +48,4 @@ core-$(CONFIG_DTB_BUILTIN) += arch/hexagon/boot/dts/
+ 
+ PHONY += dtbs
+ dtbs: scripts
+-	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
+\ No newline at end of file
++	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
+diff --git a/arch/hexagon/boot/dts/Makefile b/arch/hexagon/boot/dts/Makefile
+new file mode 100644
+index 0000000..56118d7
+--- /dev/null
++++ b/arch/hexagon/boot/dts/Makefile
+@@ -0,0 +1,10 @@
++
++ifdef CONFIG_HEXAGON_MSM8974
++dtb-${CONFIG_HEXAGON_MSM8974}	+= msm8974.dtb
++obj-${CONFIG_HEXAGON_MSM8974}	+= msm8974.dtb.o
++endif
++
++targets += dtbs
++targets += $(dtb-y)
++
++dtbs: $(addprefix $(obj)/, $(dtb-y))
+diff --git a/arch/hexagon/boot/dts/msm8974.dts b/arch/hexagon/boot/dts/msm8974.dts
+new file mode 100644
+index 0000000..b6b99ba
+--- /dev/null
++++ b/arch/hexagon/boot/dts/msm8974.dts
+@@ -0,0 +1,146 @@
++/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/clock/qcom,gcc-msm8974.h>
++#include <dt-bindings/reset/qcom,gcc-msm8974.h>
++
++/*  Bare minimum  */
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	chosen { };
++	memory { device_type = "memory"; reg = <0 0>; };
++};
++
++
++/ {
++	chosen {
++		bootargs = "";
++	};
++};
++
++
++/ {
++	model = "Qualcomm Technologies, Inc. MSM8974";
++	compatible = "qcom,msm8974";
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		interrupt-parent = <&PIC0>;
++
++		PIC0: interrupt-controller {
++			compatible = "qcom,h2-pic";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		timer {
++			compatible="qcom,h2-timer";
++			interrupts = <12>;
++		};
++
++		msmgpio: gpio@fd510000 {
++			compatible = "qcom,msm-gpio";
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0xfd510000 0x4000>;
++			ngpio = <146>;
++			interrupt-parent = <&PIC0>;
++			interrupts = <70>;
++			qcom,direct-connect-irqs = <8>;
++		};
++
++		spmi_bus: qcom,spmi@fc5c0000 {
++			cell-index = <0>;
++			compatible = "qcom,spmi-pmic-arb";
++			reg-names = "core", "intr", "cnfg";
++			reg = <0xfc4cf000 0x1000>,
++			      <0Xfc4cb000 0x1000>,
++			      <0Xfc4ca000 0x1000>;
++			interrupt-parent = <&PIC0>;
++			interrupts = <80>;
++			qcom,pmic-arb-ee = <3>;
++			qcom,pmic-arb-channel = <3>;
++		};
++
++		gcc: clock-controller@fc400000 {
++			compatible = "qcom,gcc-msm8974", "qcom,gcc";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			reg = <0xfc400000 0x4000>;
++		};
++
++		usb_otg: usb@f9a55000 {
++			compatible = "qcom,usb-otg-snps";
++			reg = <0xf9a55000 0x400>;
++			interrupts = <86>;  /*  54 + 32  */
++			dr_mode = "host";
++
++			clocks = <&gcc GCC_XO_CLK>,
++				 <&gcc GCC_USB_HS_SYSTEM_CLK>,
++				 <&gcc GCC_USB_HS_AHB_CLK>;
++			clock-names = "phy", "core", "iface";
++
++			/*  vddcx-supply = <&pm8841_s2_corner>;  not supported yet */
++			/*  v1p8-supply = <&pm8941_l6>;  not supported yet  */
++			/*  v3p3-supply = <&pm8941_l24>;  not supoprted yet  */
++
++			resets = <&gcc GCC_USB2A_PHY_BCR>,
++				 <&gcc GCC_USB_HS_BCR>;
++			reset-names = "phy", "link";
++
++			qcom,otg-control = <3>;
++			qcom,phy-init-sequence = <0x63 0x81 0xffffffff>;
++			qcom,vdd-levels = <1 5 7>;
++		};
++
++		ehci: ehci@f9a55000 {
++			compatible = "qcom,ehci-host";
++			reg = <0xf9a55000 0x400>;
++			interrupts = <86>;  /*  54 + 32  */
++			usb-phy = <&usb_otg>;
++			status="ok";
++		};
++
++		gadget@f9a55000 {
++			compatible = "qcom,ci-hdrc";
++			reg = <0xf9a55000 0x400>;
++			dr_mode = "peripheral";
++			interrupts = <86>;  /*  54 + 32  */
++			usb-phy = <&usb_otg>;
++		};
++
++	};
++};
++
++
++&soc {
++	sdhci@f9824000 {
++		compatible = "qcom,sdhci-msm-v4";
++		reg = <0xf9824900 0x11c>, <0xf9824000 0x800>;
++		reg-names = "hc_mem", "core_mem";
++		interrupt-parent = <&PIC0>;
++		interrupts = <50>;
++
++		bus-width = <8>;
++		non-removable;
++
++		clocks = <&gcc GCC_SDCC1_APPS_CLK>, <&gcc GCC_SDCC1_AHB_CLK>;
++		clock-names = "core", "iface";
++	};
++};
+diff --git a/arch/hexagon/configs/msm8974_defconfig b/arch/hexagon/configs/msm8974_defconfig
+new file mode 100644
+index 0000000..984be4b
+--- /dev/null
++++ b/arch/hexagon/configs/msm8974_defconfig
+@@ -0,0 +1,28 @@
++CONFIG_HEXAGON_ARCH_VERSION=5
++CONFIG_USE_OF=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=3
++CONFIG_PAGE_SIZE_64KB=y
++# CONFIG_COMPACTION is not set
++CONFIG_HZ_100=y
++CONFIG_CROSS_COMPILE="hexagon-linux-"
++# CONFIG_LOCALVERSION_AUTO is not set
++# CONFIG_CROSS_MEMORY_ATTACH is not set
++# CONFIG_USELIB is not set
++# CONFIG_COMPAT_BRK is not set
++# CONFIG_UEVENT_HELPER is not set
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_DEVMEM is not set
++# CONFIG_DEVKMEM is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_MISC_FILESYSTEMS is not set
++# CONFIG_BINFMT_ELF is not set
++# CONFIG_BINFMT_SCRIPT is not set
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
+diff --git a/arch/hexagon/platform/msm8974/Kconfig b/arch/hexagon/platform/msm8974/Kconfig
+new file mode 100644
+index 0000000..77d13e5
+--- /dev/null
++++ b/arch/hexagon/platform/msm8974/Kconfig
+@@ -0,0 +1 @@
++# this space intentionally left blank
+diff --git a/arch/hexagon/platform/msm8974/Makefile b/arch/hexagon/platform/msm8974/Makefile
+new file mode 100644
+index 0000000..dcfc293
+--- /dev/null
++++ b/arch/hexagon/platform/msm8974/Makefile
+@@ -0,0 +1 @@
++obj-y += board.o
+diff --git a/arch/hexagon/platform/msm8974/board.c b/arch/hexagon/platform/msm8974/board.c
+new file mode 100644
+index 0000000..93ac71d
+--- /dev/null
++++ b/arch/hexagon/platform/msm8974/board.c
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <asm/dma.h>
++#include <asm/irq.h>
++#include <asm/platform.h>
++
++static const char *msm8974_dt_compat[] __initconst = {
++	"qcom,msm8974",
++	NULL
++};
++
++static int __init msm8974_init(void)
++{
++	if (strcmp(mdesc->name, "msm8974"))
++		return 0;
++
++	hexagon_dma_init();
++
++	of_platform_populate(of_find_node_by_path("/soc"),
++		of_default_bus_match_table, NULL, NULL);
++
++	return 0;
++}
++core_initcall(msm8974_init);
++
++void setup_arch_msm8974(void)
++{
++	pr_info("Platform:  MDP 8974\n");
++	bootmem_lastpg = PFN_DOWN(1<<28);
++}
++
++MACHINE_START(MSM8974_FLUID, "msm8974")
++	.setup_arch_machine = setup_arch_msm8974,
++	.dt_compat = msm8974_dt_compat
++MACHINE_END
+-- 
+1.8.4.3
+

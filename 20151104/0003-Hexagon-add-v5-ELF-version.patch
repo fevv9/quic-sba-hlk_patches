@@ -1,0 +1,29 @@
+From b7ba23fe686f0b4fcc0ca7d099992288ffd98357 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Fri, 11 Oct 2013 19:22:38 -0500
+Subject: [PATCH 03/22] Hexagon: add v5 ELF version
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/elf.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/hexagon/include/asm/elf.h b/arch/hexagon/include/asm/elf.h
+index 80311e7..9d307d8 100644
+--- a/arch/hexagon/include/asm/elf.h
++++ b/arch/hexagon/include/asm/elf.h
+@@ -189,6 +189,11 @@ do {					\
+ #define ELF_CORE_EFLAGS 0x3
+ #endif
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION == 5
++#define ELF_CORE_EFLAGS 0x4
++#endif
++
++
+ /*
+  * Some architectures have ld.so set up a pointer to a function
+  * to be registered using atexit, to facilitate cleanup.  So that
+-- 
+1.8.4.3
+

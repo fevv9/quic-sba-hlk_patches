@@ -1,0 +1,101 @@
+From abad9eabf5f650502deb373c7f8ad523a901e0a1 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 26 Oct 2015 18:19:17 -0500
+Subject: [PATCH 01/22] Hexagon: re-split setup.h
+
+There's some setup stuff that doesn't need to go to uapi; split
+the kernel stuff back out to the kernel include area and pull
+in the generic setup.h.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/setup.h      | 24 ++++++++++++++++++++++++
+ arch/hexagon/include/uapi/asm/Kbuild  |  2 ++
+ arch/hexagon/include/uapi/asm/setup.h | 34 ----------------------------------
+ 3 files changed, 26 insertions(+), 34 deletions(-)
+ create mode 100644 arch/hexagon/include/asm/setup.h
+ delete mode 100644 arch/hexagon/include/uapi/asm/setup.h
+
+diff --git a/arch/hexagon/include/asm/setup.h b/arch/hexagon/include/asm/setup.h
+new file mode 100644
+index 0000000..60ee99a
+--- /dev/null
++++ b/arch/hexagon/include/asm/setup.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (c) 2010-2011,2015 The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _ASM_SETUP_H
++#define _ASM_SETUP_H
++
++#include <linux/init.h>
++#include <uapi/asm/setup.h>
++
++extern char external_buffer;
++void __init setup_arch_memory(void);
++
++#endif
+diff --git a/arch/hexagon/include/uapi/asm/Kbuild b/arch/hexagon/include/uapi/asm/Kbuild
+index c31706c..3016a86 100644
+--- a/arch/hexagon/include/uapi/asm/Kbuild
++++ b/arch/hexagon/include/uapi/asm/Kbuild
+@@ -13,3 +13,5 @@ header-y += signal.h
+ header-y += swab.h
+ header-y += unistd.h
+ header-y += user.h
++
++generic-y += setup.h
+diff --git a/arch/hexagon/include/uapi/asm/setup.h b/arch/hexagon/include/uapi/asm/setup.h
+deleted file mode 100644
+index 7e3952d..0000000
+--- a/arch/hexagon/include/uapi/asm/setup.h
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- */
+-
+-#ifndef _ASM_SETUP_H
+-#define _ASM_SETUP_H
+-
+-#ifdef __KERNEL__
+-#include <linux/init.h>
+-#else
+-#define __init
+-#endif
+-
+-#include <asm-generic/setup.h>
+-
+-extern char external_cmdline_buffer;
+-
+-void __init setup_arch_memory(void);
+-
+-#endif
+-- 
+1.8.4.3
+

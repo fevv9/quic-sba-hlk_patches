@@ -1,0 +1,450 @@
+From 640e47534666f9b069a98ea54ec6c3246a9cc1eb Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Fri, 23 Oct 2015 19:58:53 -0500
+Subject: [PATCH 18/22] Hexagon: add cached version of interrupt enable/disable
+
+Interrupt enable/disable are calls to the hypervisor in our port, which
+is somewhat painful given how often they are called, and worse, when
+they're called to make a non-change.  So cache the state and only call
+the hypervisor when a change is detected.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/hexagon_vm.h |  8 +++++-
+ arch/hexagon/include/asm/irqflags.h   | 14 ++++-----
+ arch/hexagon/kernel/hexagon_ksyms.c   |  4 +--
+ arch/hexagon/kernel/irq_cpu.c         | 40 +++++++++++++++++++-------
+ arch/hexagon/kernel/smp.c             |  2 ++
+ arch/hexagon/kernel/traps.c           |  7 ++++-
+ arch/hexagon/kernel/vm_entry.S        | 37 ++++++++++++++++--------
+ arch/hexagon/kernel/vm_events.c       |  2 ++
+ arch/hexagon/kernel/vm_ops.S          | 53 +++++++++++++++++++++++++++++++++--
+ 9 files changed, 132 insertions(+), 35 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/hexagon_vm.h b/arch/hexagon/include/asm/hexagon_vm.h
+index a111692..01f7584 100644
+--- a/arch/hexagon/include/asm/hexagon_vm.h
++++ b/arch/hexagon/include/asm/hexagon_vm.h
+@@ -99,7 +99,13 @@ extern void _K_VM_event_vector(void);
+ 
+ void __vmrte(void);
+ long __vmsetvec(void *);
+-long __vmsetie(long);
++
++void load_ie_cache(void);
++long vmgetie_cached(void);
++long vmsetie_cached(long);
++long __vmsetie_cached(long, long *);
++void clear_ie_cached(void);
++
+ long __vmgetie(void);
+ long __vmintop(enum VM_INT_OPS, long, long, long, long);
+ long __vmclrmap(void *, unsigned long);
+diff --git a/arch/hexagon/include/asm/irqflags.h b/arch/hexagon/include/asm/irqflags.h
+index e5fd949..7b9b821 100644
+--- a/arch/hexagon/include/asm/irqflags.h
++++ b/arch/hexagon/include/asm/irqflags.h
+@@ -1,7 +1,7 @@
+ /*
+  * IRQ support for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -26,12 +26,12 @@
+ 
+ static inline unsigned long arch_local_save_flags(void)
+ {
+-	return __vmgetie();
++	return vmgetie_cached();
+ }
+ 
+ static inline unsigned long arch_local_irq_save(void)
+ {
+-	return __vmsetie(VM_INT_DISABLE);
++	return vmsetie_cached(VM_INT_DISABLE);
+ }
+ 
+ static inline bool arch_irqs_disabled_flags(unsigned long flags)
+@@ -41,22 +41,22 @@ static inline bool arch_irqs_disabled_flags(unsigned long flags)
+ 
+ static inline bool arch_irqs_disabled(void)
+ {
+-	return !__vmgetie();
++	return !vmgetie_cached();
+ }
+ 
+ static inline void arch_local_irq_enable(void)
+ {
+-	__vmsetie(VM_INT_ENABLE);
++	vmsetie_cached(VM_INT_ENABLE);
+ }
+ 
+ static inline void arch_local_irq_disable(void)
+ {
+-	__vmsetie(VM_INT_DISABLE);
++	vmsetie_cached(VM_INT_DISABLE);
+ }
+ 
+ static inline void arch_local_irq_restore(unsigned long flags)
+ {
+-	__vmsetie(flags);
++	vmsetie_cached(flags);
+ }
+ 
+ #endif
+diff --git a/arch/hexagon/kernel/hexagon_ksyms.c b/arch/hexagon/kernel/hexagon_ksyms.c
+index c041d8e..d4e9371 100644
+--- a/arch/hexagon/kernel/hexagon_ksyms.c
++++ b/arch/hexagon/kernel/hexagon_ksyms.c
+@@ -1,7 +1,7 @@
+ /*
+  * Export of symbols defined in assembly files and/or libgcc.
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2015 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -30,7 +30,7 @@ EXPORT_SYMBOL(__copy_to_user_hexagon);
+ EXPORT_SYMBOL(__iounmap);
+ EXPORT_SYMBOL(__strnlen_user);
+ EXPORT_SYMBOL(__vmgetie);
+-EXPORT_SYMBOL(__vmsetie);
++EXPORT_SYMBOL(__vmsetie_cached);
+ EXPORT_SYMBOL(__vmyield);
+ EXPORT_SYMBOL(empty_zero_page);
+ EXPORT_SYMBOL(ioremap_nocache);
+diff --git a/arch/hexagon/kernel/irq_cpu.c b/arch/hexagon/kernel/irq_cpu.c
+index bc1a72a..80e6fd3 100644
+--- a/arch/hexagon/kernel/irq_cpu.c
++++ b/arch/hexagon/kernel/irq_cpu.c
+@@ -1,7 +1,7 @@
+ /*
+  * First-level interrupt controller model for Hexagon.
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -23,28 +23,48 @@
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
++#include <linux/percpu.h>
+ #include <asm/irq.h>
+ #include <asm/hexagon_vm.h>
+ 
+-static void mask_irq(struct irq_data *data)
++DEFINE_PER_CPU(long, ie_cached);
++
++/*  caching replacement for the old __vmsetie()  */
++
++long vmsetie_cached(long val)
++{
++	return __vmsetie_cached(val, this_cpu_ptr(&ie_cached));
++}
++
++/*
++ * sets the interrupt enable (ie) state, but fudges the cache val because
++ * vmrte can still change ie on us; see vm_entry.S
++ */
++
++void vmsetie_rte_disable(void)
++{
++	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
++	__this_cpu_write(ie_cached, ints_enabled(current_thread_info()->regs));
++}
++
++void vmsetie_disable(void)
+ {
+-	__vmintop_locdis((long) data->irq);
++	__vmsetie_cached(VM_INT_DISABLE, this_cpu_ptr(&ie_cached));
+ }
+ 
+-static void mask_irq_num(unsigned int irq)
++long vmgetie_cached(void)
+ {
+-	__vmintop_locdis((long) irq);
++	return __this_cpu_read(ie_cached);
+ }
+ 
+-static void unmask_irq(struct irq_data *data)
++void load_ie_cache(void)
+ {
+-	__vmintop_locen((long) data->irq);
++	__this_cpu_write(ie_cached, __vmgetie());
+ }
+ 
+-/*  This is actually all we need for handle_fasteoi_irq  */
+-static void eoi_irq(struct irq_data *data)
++void clear_ie_cached(void)
+ {
+-	__vmintop_globen((long) data->irq);
++	__this_cpu_write(ie_cached, 0);
+ }
+ 
+ void __init init_IRQ(void)
+diff --git a/arch/hexagon/kernel/smp.c b/arch/hexagon/kernel/smp.c
+index 5baa8ca..91f72c3 100644
+--- a/arch/hexagon/kernel/smp.c
++++ b/arch/hexagon/kernel/smp.c
+@@ -195,6 +195,8 @@ void start_secondary(void)
+ 
+ 	set_cpu_online(cpu, true);
+ 
++	load_ie_cache();
++
+ 	local_irq_enable();
+ 
+ 	cpu_startup_entry(CPUHP_ONLINE);
+diff --git a/arch/hexagon/kernel/traps.c b/arch/hexagon/kernel/traps.c
+index 408de06..b01b06c 100644
+--- a/arch/hexagon/kernel/traps.c
++++ b/arch/hexagon/kernel/traps.c
+@@ -301,6 +301,7 @@ static void cache_error(struct pt_regs *regs)
+  */
+ void do_genex(struct pt_regs *regs)
+ {
++	clear_ie_cached();
+ 	/*
+ 	 * Decode Cause and Dispatch
+ 	 */
+@@ -360,6 +361,8 @@ void do_trap0(struct pt_regs *regs)
+ {
+ 	syscall_fn syscall;
+ 
++	clear_ie_cached();
++
+ 	switch (pt_cause(regs)) {
+ 	case TRAP_SYSCALL:
+ 		/* System call is trap0 #1 */
+@@ -370,7 +373,7 @@ void do_trap0(struct pt_regs *regs)
+ 			return;  /*  return -ENOSYS somewhere?  */
+ 
+ 		/* Interrupts should be re-enabled for syscall processing */
+-		__vmsetie(VM_INT_ENABLE);
++		vmsetie_cached(VM_INT_ENABLE);
+ 
+ 		/*
+ 		 * System call number is in r6, arguments in r0..r5.
+@@ -440,6 +443,7 @@ void do_trap0(struct pt_regs *regs)
+  */
+ void do_machcheck(struct pt_regs *regs)
+ {
++	clear_ie_cached();
+ 	/* Halt and catch fire */
+ 	__vmstop(hvmstop_machinecheck);
+ }
+@@ -450,6 +454,7 @@ void do_machcheck(struct pt_regs *regs)
+ 
+ void do_debug_exception(struct pt_regs *regs)
+ {
++	/*  normally we clear ie cached, but we're calling do_trap0 anyways  */
+ 	regs->hvmer.vmest &= ~HVM_VMEST_CAUSE_MSK;
+ 	regs->hvmer.vmest |= (TRAP_DEBUG << HVM_VMEST_CAUSE_SFT);
+ 	do_trap0(regs);
+diff --git a/arch/hexagon/kernel/vm_entry.S b/arch/hexagon/kernel/vm_entry.S
+index d6728fc..8c5a193 100644
+--- a/arch/hexagon/kernel/vm_entry.S
++++ b/arch/hexagon/kernel/vm_entry.S
+@@ -1,7 +1,7 @@
+ /*
+  * Event entry/exit for Hexagon
+  *
+- * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013,2015, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -272,7 +272,14 @@
+ 
+ event_dispatch:
+ 	save_pt_regs()
+-	callr	r1
++	/*
++	 * Note:  every event handler needs to clear the IE cache bit,
++	 * preferably early.
++	 */
++	{
++		callr	r1
++		R17.H = #HI(vmsetie_rte_disable);
++	}
+ 
+ 	/*
+ 	 * Coming back from the C-world, our thread info pointer
+@@ -285,49 +292,55 @@ event_dispatch:
+ 	 */
+ 
+ #ifdef CONFIG_PREEMPT
+-	R0 = #VM_INT_DISABLE
+-	trap1(#HVM_TRAP1_VMSETIE)
++	R16.L = #LO(vmsetie_disable);
++	R16.H = #HI(vmsetie_disable);
++	callr R16
+ #endif
+ 
+ 	/*  "Nested control path" -- if the previous mode was kernel  */
+ 	{
+ 		R0 = memw(R29 + #_PT_ER_VMEST);
+ 		R26.L = #LO(do_work_pending);
++		R16.L = #LO(vmsetie_disable);
++		R17.L = #LO(vmsetie_rte_disable);
+ 	}
+ 	{
+ 		P0 = tstbit(R0, #HVM_VMEST_UM_SFT);
+ 		if (!P0.new) jump:nt restore_all;
+ 		R26.H = #HI(do_work_pending);
+-		R0 = #VM_INT_DISABLE;
++		R16.H = #HI(vmsetie_disable);
+ 	}
+ 
+ 	/*
+ 	 * Check also the return from fork/system call, normally coming back from
+ 	 * user mode
+ 	 *
+-	 * R26 needs to have do_work_pending, and R0 should have VM_INT_DISABLE
++	 * R26 needs to have do_work_pending, R16 should have vmsetie_disable,
++	 * and R17 might need to be reloaded with vmsetie_rte_disable in the
++	 * fork case.
+ 	 */
+ 
+ check_work_pending:
+ 	/*  Disable interrupts while checking TIF  */
+-	trap1(#HVM_TRAP1_VMSETIE)
++	callr R16
++
+ 	{
+ 		R0 = R29;  /*  regs should still be at top of stack  */
+ 		R1 = memw(THREADINFO_REG + #_THREAD_INFO_FLAGS);
+ 		callr R26;
++		R17.H = #HI(vmsetie_rte_disable);
+ 	}
+ 
+ 	{
+ 		P0 = cmp.eq(R0, #0); if (!P0.new) jump:nt check_work_pending;
+-		R0 = #VM_INT_DISABLE;
++		R17.L = #LO(vmsetie_rte_disable);
+ 	}
+ 
+ restore_all:
+ 	/*
+ 	 * Disable interrupts, if they weren't already, before reg restore.
+-	 * R0 gets preloaded with #VM_INT_DISABLE before we get here.
+ 	 */
+-	trap1(#HVM_TRAP1_VMSETIE)
++	callr R17
+ 
+ 	/*  do the setregs here for VM 0.5  */
+ 	/*  R29 here should already be pointing at pt_regs  */
+@@ -377,11 +390,12 @@ ret_from_fork:
+ 	{
+ 		call schedule_tail
+ 		R26.H = #HI(do_work_pending);
++		R16.H = #HI(vmsetie_disable);
+ 	}
+ 	{
+ 		P0 = cmp.eq(R24, #0);
+ 		R26.L = #LO(do_work_pending);
+-		R0 = #VM_INT_DISABLE;
++		R16.L = #LO(vmsetie_disable);
+ 	}
+ 	if P0 jump check_work_pending
+ 	{
+@@ -390,5 +404,4 @@ ret_from_fork:
+ 	}
+ 	{
+ 		jump check_work_pending
+-		R0 = #VM_INT_DISABLE;
+ 	}
+diff --git a/arch/hexagon/kernel/vm_events.c b/arch/hexagon/kernel/vm_events.c
+index 4b22001..ad0504d 100644
+--- a/arch/hexagon/kernel/vm_events.c
++++ b/arch/hexagon/kernel/vm_events.c
+@@ -99,6 +99,8 @@ void arch_do_IRQ(struct pt_regs *regs)
+ 	int virq;
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	clear_ie_cached();
++
+ 	irq_enter();
+ 	/*  return of zero here is an error btw  */
+ 	virq = irq_find_mapping(NULL, irq);
+diff --git a/arch/hexagon/kernel/vm_ops.S b/arch/hexagon/kernel/vm_ops.S
+index f041b0a..827b10b 100644
+--- a/arch/hexagon/kernel/vm_ops.S
++++ b/arch/hexagon/kernel/vm_ops.S
+@@ -1,7 +1,7 @@
+ /*
+  * Hexagon VM instruction support
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2015 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -42,8 +42,57 @@ ENTRY(__vmsetvec)
+ 	trap1(#HVM_TRAP1_VMSETVEC);
+ 	jumpr	R31;
+ 
+-ENTRY(__vmsetie)
++ENTRY(__vmsetie_cached)
++	{
++	  allocframe(#8);
++	  memd(SP+#-16) = R17:16;
++	  R17:16 = R1:0;
++	}
++retry:
++	r2 = memw_locked(r17);
++	{
++	  p0 = cmp.eq(r2, r16);
++	  if (p0.new) jump:t nochange;
++	}
++change:
++	{
++	  p0 = cmp.eq(r2, #0);
++	  if (!p0.new) jump:t ints_were_enabled;
++	}
++ints_were_disabled:	/* 0->1 */
++	/*  Interrupts currently off, so nobody should have interrupted us */
++	/*  Except the hypervisor, which might make us lose our reservation. */
++	memw_locked(r17, p0) = r16;	/* should always pass? */
++	if (!p0) jump retry;
+ 	trap1(#HVM_TRAP1_VMSETIE);
++	jump out;	/* oldval READY 2 ROCK */
++ints_were_enabled:	/* 1->0 */
++	/* oldval is ready to go; but now all caller saves are potentially
++	   trampled, dependent on VM_CLOBBERLIST */
++	trap1(#HVM_TRAP1_VMSETIE);
++	/*
++	 * If something else interrupted us in the midst of all this,
++	 * it doesn't matter -- by this point, we won.  We got the setie(0),
++	 * and now we call the shots.  Break reservations and force the value.
++	 */
++force_change:				/* still doing 1->0 */
++	memw_locked(r17, p0) = r16;	/* break other reservation */
++	/* reservations can spontaneously be lost, so just retry. */
++	if (p0) jump out;
++	r2 = memw_locked(r17);
++	jump force_change;
++nochange:
++	/* Not totally sure if this is necessary.  */
++	memw_locked(r17, p0) = r16;
++	if (!p0) jump retry
++out:
++	{
++	  R17:16 = memd(SP+#0);
++	  dealloc_return;
++	}
++
++ENTRY(__vmgetinfo)
++	trap1(#HVM_TRAP1_VMGETINFO);
+ 	jumpr	R31;
+ 
+ ENTRY(__vmgetie)
+-- 
+1.8.4.3
+

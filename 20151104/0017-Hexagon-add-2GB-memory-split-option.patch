@@ -1,0 +1,94 @@
+From 2df1cb5dab71d7c5bd227a82a4df08dd24e154fc Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Fri, 23 Oct 2015 18:06:22 -0500
+Subject: [PATCH 17/22] Hexagon: add 2GB memory split option
+
+Allow the kernel/user split to be at 2GB instead of 3GB.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig                  | 5 +++++
+ arch/hexagon/include/asm/mem-layout.h | 4 ++++
+ arch/hexagon/kernel/head.S            | 5 ++++-
+ arch/hexagon/mm/init.c                | 9 +++++++--
+ 4 files changed, 20 insertions(+), 3 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 5e6a41e..f66ed22 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -59,6 +59,11 @@ config TRACE_IRQFLAGS_SUPPORT
+ config GENERIC_CSUM
+ 	def_bool y
+ 
++config HEXAGON_SPLIT_2GB
++	def_bool n
++	---help---
++	  Kernel/user split is at 2GB instead of 3GB (0xc0000000)
++
+ #
+ # Use the generic interrupt handling code in kernel/irq/:
+ #
+diff --git a/arch/hexagon/include/asm/mem-layout.h b/arch/hexagon/include/asm/mem-layout.h
+index 60556f8..6dea579 100644
+--- a/arch/hexagon/include/asm/mem-layout.h
++++ b/arch/hexagon/include/asm/mem-layout.h
+@@ -29,7 +29,11 @@
+  * assign it to the location counter.
+  */
+ 
++#ifdef CONFIG_HEXAGON_SPLIT_2GB
++#define PAGE_OFFSET			_AC(0x80000000, UL)
++#else
+ #define PAGE_OFFSET			_AC(0xc0000000, UL)
++#endif
+ 
+ /*
+  * Compiling for a platform that needs a crazy physical offset
+diff --git a/arch/hexagon/kernel/head.S b/arch/hexagon/kernel/head.S
+index 9f0977b..5e8835f 100644
+--- a/arch/hexagon/kernel/head.S
++++ b/arch/hexagon/kernel/head.S
+@@ -27,8 +27,11 @@
+ #include <asm/page.h>
+ #include <asm/hexagon_vm.h>
+ 
++#ifdef CONFIG_HEXAGON_SPLIT_2GB
++#define SEGTABLE_ENTRIES #0x1e0
++#else
+ #define SEGTABLE_ENTRIES #0x0e0
+-
++#endif
+ 	__INIT
+ ENTRY(stext)
+ 	/*
+diff --git a/arch/hexagon/mm/init.c b/arch/hexagon/mm/init.c
+index 88977e4..d02dd56 100644
+--- a/arch/hexagon/mm/init.c
++++ b/arch/hexagon/mm/init.c
+@@ -45,6 +45,12 @@ unsigned long zero_page_mask;
+ /*  indicate pfn's of high memory  */
+ unsigned long highstart_pfn, highend_pfn;
+ 
++#ifdef CONFIG_HEXAGON_SPLIT_2GB
++#define KERNEL_BIGPAGES_GB (2)
++#else
++#define KERNEL_BIGPAGES_GB (1)
++#endif
++
+ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+ 
+ /* Default cache attribute for newly created page tables */
+@@ -222,8 +228,7 @@ void __init setup_arch_memory(void)
+ 	/*  this is pointer arithmetic; each entry covers 4MB  */
+ 	segtable = segtable + (PAGE_OFFSET >> 22);
+ 
+-	/*  this actually only goes to the end of the first gig  */
+-	segtable_end = segtable + (1<<(30-22));
++	segtable_end = segtable + (KERNEL_BIGPAGES_GB<<(30-22));
+ 
+ 	/*
+ 	 * Move forward to the start of empty pages; take into account
+-- 
+1.8.4.3
+

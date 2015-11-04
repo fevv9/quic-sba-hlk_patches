@@ -1,0 +1,92 @@
+From 31fbed28463d542390400f2d523b366ad6655228 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 8 Oct 2013 16:08:06 -0500
+Subject: [PATCH 16/22] Hexagon: add hardware prefetch settings
+
+dcache prefetch is in a user-mode register which might not always be set
+for best performance.
+
+When switching into the kernel, the kernel always sets it for itself to
+improve performance.  This gets restored on the way back out.
+
+For processes, a Kconfig switch is added to initialize the register if
+desired.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig           | 12 ++++++++++++
+ arch/hexagon/kernel/process.c  |  6 +++++-
+ arch/hexagon/kernel/vm_entry.S |  3 ++-
+ 3 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 8879aa8..5e6a41e 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -114,6 +114,18 @@ config HEXAGON_ARCH_VERSION
+ 	int "Architecture version"
+ 	default 2
+ 
++config HEXAGON_FORCE_USR
++	bool "Force USR bit at start of process"
++	default y
++	help
++	  If set, new processes will have their USR bit forced to a specified
++	  value.
++
++config HEXAGON_USR_VAL
++	hex "USR value to force"
++	default 0x56000
++	depends on HEXAGON_FORCE_USR
++
+ config USE_OF
+ 	default n
+ 	bool "Device Tree support"
+diff --git a/arch/hexagon/kernel/process.c b/arch/hexagon/kernel/process.c
+index a9ebd47..2ef3de6 100644
+--- a/arch/hexagon/kernel/process.c
++++ b/arch/hexagon/kernel/process.c
+@@ -1,7 +1,7 @@
+ /*
+  * Process creation support for Hexagon
+  *
+- * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -43,6 +43,10 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
+ 	pt_set_usermode(regs);
+ 	pt_set_elr(regs, pc);
+ 	pt_set_rte_sp(regs, sp);
++
++#ifdef CONFIG_HEXAGON_FORCE_USR
++	regs->usr = CONFIG_HEXAGON_USR_VAL;
++#endif
+ }
+ 
+ /*
+diff --git a/arch/hexagon/kernel/vm_entry.S b/arch/hexagon/kernel/vm_entry.S
+index 67c6ccc..d6728fc 100644
+--- a/arch/hexagon/kernel/vm_entry.S
++++ b/arch/hexagon/kernel/vm_entry.S
+@@ -236,6 +236,7 @@
+ #else
+ /* V4+ */
+ /* turn on I$ prefetch early */
++/* turn on D$ prefetch early */
+ /* the # ## # syntax inserts a literal ## */
+ #define	vm_event_entry(CHandler) \
+ 	{ \
+@@ -246,7 +247,7 @@
+ 	} \
+ 	{ \
+ 		memw(R29 + #_PT_PREDSUSR) = R0; \
+-		R0 = setbit(R0, #16); \
++		R0 = or(R0, # ## #0x56000); \
+ 	} \
+ 	usr = R0; \
+ 	R1:0 = G1:0; \
+-- 
+1.8.4.3
+

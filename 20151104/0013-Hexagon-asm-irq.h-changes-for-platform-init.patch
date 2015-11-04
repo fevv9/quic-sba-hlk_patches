@@ -1,0 +1,29 @@
+From 008325b55f9b711895e49c6af6fc3155b3d4c75b Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 22 Oct 2015 14:14:53 -0500
+Subject: [PATCH 13/22] Hexagon: asm/irq.h changes for platform init
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/irq.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/hexagon/include/asm/irq.h b/arch/hexagon/include/asm/irq.h
+index 1772ad3..0472ad8 100644
+--- a/arch/hexagon/include/asm/irq.h
++++ b/arch/hexagon/include/asm/irq.h
+@@ -33,4 +33,11 @@
+ 
+ #include <asm-generic/irq.h>
+ 
++#include <linux/of.h>
++
++/*  H2 "pic" initialization at init_IRQ time  */
++int __init hexagon_pic_of_init(struct device_node *node,
++			       struct device_node *parent);
++
++
+ #endif
+-- 
+1.8.4.3
+

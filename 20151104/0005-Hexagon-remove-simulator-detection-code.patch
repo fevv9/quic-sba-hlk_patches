@@ -1,0 +1,46 @@
+From 2144ab850fe83f444df4704e2b1ff0cf5dbf46be Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 20 Oct 2015 14:30:33 -0500
+Subject: [PATCH 05/22] Hexagon: remove simulator detection code
+
+Dead code that's not really necessary anymore; better to use
+something else.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/kernel/setup.c | 12 ------------
+ 1 file changed, 12 deletions(-)
+
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index 6981949..dae04cf 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -37,8 +37,6 @@
+ char cmd_line[COMMAND_LINE_SIZE];
+ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+ 
+-int on_simulator;
+-
+ void calibrate_delay(void)
+ {
+ 	loops_per_jiffy = thread_freq_mhz * 1000000 / HZ;
+@@ -68,16 +66,6 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	printk(KERN_INFO "PHYS_OFFSET=0x%08x\n", PHYS_OFFSET);
+ 
+-	/*
+-	 * Simulator has a few differences from the hardware.
+-	 * For now, check uninitialized-but-mapped memory
+-	 * prior to invoking setup_arch_memory().
+-	 */
+-	if (*(int *)((unsigned long)_end + 8) == 0x1f1f1f1f)
+-		on_simulator = 1;
+-	else
+-		on_simulator = 0;
+-
+ 	if (p[0] != '\0')
+ 		strlcpy(boot_command_line, p, COMMAND_LINE_SIZE);
+ 	else
+-- 
+1.8.4.3
+

@@ -1,0 +1,87 @@
+From 9e542e2a0ae90a57e739c0d937e806685998532e Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Wed, 21 Oct 2015 12:28:17 -0500
+Subject: [PATCH 09/22] Hexagon: add machine description header
+
+Add the machine description macros and the section in the linker
+script to stuff them.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/mach_desc.h | 44 ++++++++++++++++++++++++++++++++++++
+ arch/hexagon/kernel/vmlinux.lds.S    |  8 +++++++
+ 2 files changed, 52 insertions(+)
+ create mode 100644 arch/hexagon/include/asm/mach_desc.h
+
+diff --git a/arch/hexagon/include/asm/mach_desc.h b/arch/hexagon/include/asm/mach_desc.h
+new file mode 100644
+index 0000000..6e349b6
+--- /dev/null
++++ b/arch/hexagon/include/asm/mach_desc.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2000 Russell King
++ * Copyright (C) 2011,2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASSEMBLY__
++
++struct machine_desc {
++	const char	*name;
++	const char	**dt_compat;
++	/*  super-early arch setup hook  */
++	void		(*setup_arch_machine)(void);
++};
++
++/*
++ * Current machine - only accessible during boot.
++ */
++extern struct machine_desc *mdesc;
++
++/*
++ * Machine type table - also only accessible during boot
++ */
++extern struct machine_desc __arch_info_begin[], __arch_info_end[];
++#define for_each_machine_desc(p)			\
++	for (p = __arch_info_begin; p < __arch_info_end; p++)
++
++/*
++ * Set of macros to define architecture features.  This is built into
++ * a table by the linker.
++ */
++#define MACHINE_START(_type, _name)			\
++static const struct machine_desc __mach_desc_##_type	\
++ __used							\
++ __attribute__((__section__(".arch.info.init"))) = {	\
++	.name		= _name,
++
++#define MACHINE_END				\
++};
++
++#endif
+diff --git a/arch/hexagon/kernel/vmlinux.lds.S b/arch/hexagon/kernel/vmlinux.lds.S
+index 5f268c1..501352a 100644
+--- a/arch/hexagon/kernel/vmlinux.lds.S
++++ b/arch/hexagon/kernel/vmlinux.lds.S
+@@ -42,6 +42,14 @@ SECTIONS
+ 	HEAD_TEXT_SECTION
+ 	INIT_TEXT_SECTION(PAGE_SIZE)
+ 	PERCPU_SECTION(L1_CACHE_BYTES)
++
++	. = ALIGN(4);
++	.arch.info.init : AT(ADDR(.arch.info.init)) {
++	__arch_info_begin = .;
++		*(.arch.info.init)
++	__arch_info_end = .;
++	}
++
+ 	__init_end = .;
+ 
+         . = ALIGN(_PAGE_SIZE);
+-- 
+1.8.4.3
+

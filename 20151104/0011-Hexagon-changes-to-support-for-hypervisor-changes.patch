@@ -1,0 +1,439 @@
+From f96a7ecece4d4f65140b5fb8d0e0f60b638833b8 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Wed, 13 Jun 2012 13:39:39 -0500
+Subject: [PATCH 11/22] Hexagon: changes to support for hypervisor changes
+
+This patch adds support for changes and additions to the
+hypervisor interface.
+
+The new calls:  __vmversion, __vmgetinfo
+
+Most of the changes are for things like passing cpu
+identification when posting interrupts, and telling the
+hypervisor to clear the TLB when changing page tables.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/hexagon_vm.h  | 40 +++++++++++++++++++++++++++-------
+ arch/hexagon/include/asm/irq.h         |  4 ++--
+ arch/hexagon/include/asm/mmu_context.h |  5 +++--
+ arch/hexagon/kernel/head.S             | 21 ++++++++++++++++--
+ arch/hexagon/kernel/reset.c            | 13 ++++++++---
+ arch/hexagon/kernel/setup.c            |  7 +++++-
+ arch/hexagon/kernel/smp.c              | 18 ++++++++++++---
+ arch/hexagon/kernel/traps.c            |  2 +-
+ arch/hexagon/kernel/vm_ops.S           |  9 +++++++-
+ arch/hexagon/mm/vm_tlb.c               |  6 ++---
+ 10 files changed, 99 insertions(+), 26 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/hexagon_vm.h b/arch/hexagon/include/asm/hexagon_vm.h
+index 1f6918b..a111692 100644
+--- a/arch/hexagon/include/asm/hexagon_vm.h
++++ b/arch/hexagon/include/asm/hexagon_vm.h
+@@ -1,7 +1,7 @@
+ /*
+- * Declarations for to Hexagon Virtal Machine.
++ * Declarations for to Hexagon Virtual Machine.
+  *
+- * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -51,6 +51,7 @@
+ #define HVM_TRAP1_VMSETREGS		21
+ #define HVM_TRAP1_VMGETREGS		22
+ #define HVM_TRAP1_VMTIMEROP		24
++#define HVM_TRAP1_VMGETINFO		26
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -78,6 +79,22 @@ enum VM_INT_OPS {
+ 	hvmi_clear
+ };
+ 
++enum VM_TIMER_OPS {
++	getfreq,
++	getres,
++	gettime,
++	gettimeout,
++	settimeout,
++	deltatimeout
++};
++
++enum VM_STOP_STATUS {
++	hvmstop_none,
++	hvmstop_poweroff,
++	hvmstop_halt,
++	hvmstop_restart,
++	hvmstop_machinecheck
++};
+ extern void _K_VM_event_vector(void);
+ 
+ void __vmrte(void);
+@@ -86,15 +103,21 @@ long __vmsetie(long);
+ long __vmgetie(void);
+ long __vmintop(enum VM_INT_OPS, long, long, long, long);
+ long __vmclrmap(void *, unsigned long);
+-long __vmnewmap(void *);
++long __vmnewmap(void *, unsigned long type, unsigned long tlb_flush_flag);
+ long __vmcache(enum VM_CACHE_OPS op, unsigned long addr, unsigned long len);
+ unsigned long long __vmgettime(void);
+ long __vmsettime(unsigned long long);
+-long __vmstart(void *, void *);
+-void __vmstop(void);
++long __vmstart(void *, void *, int relprio);
++void __vmstop(enum VM_STOP_STATUS);
+ long __vmwait(void);
+ void __vmyield(void);
+ long __vmvpid(void);
++unsigned long __vmgetinfo(unsigned long);
++
++unsigned long long __vmtimerop(enum VM_TIMER_OPS op, unsigned long dummy,
++			       unsigned long long timeout);
++
++unsigned long __vmversion(void);
+ 
+ static inline long __vmcache_ickill(void)
+ {
+@@ -179,9 +202,9 @@ static inline long __vmintop_status(long i)
+ 	return __vmintop(hvmi_status, i, 0, 0, 0);
+ }
+ 
+-static inline long __vmintop_post(long i)
++static inline long __vmintop_post(long i, long cpu)
+ {
+-	return __vmintop(hvmi_post, i, 0, 0, 0);
++	return __vmintop(hvmi_post, i, cpu, 0, 0);
+ }
+ 
+ static inline long __vmintop_clear(long i)
+@@ -189,6 +212,7 @@ static inline long __vmintop_clear(long i)
+ 	return __vmintop(hvmi_clear, i, 0, 0, 0);
+ }
+ 
++
+ #else /* Only assembly code should reference these */
+ 
+ #endif /* __ASSEMBLY__ */
+@@ -262,7 +286,7 @@ static inline long __vmintop_clear(long i)
+ 
+ #define HVM_GE_C_BUS	0x01
+ #define HVM_GE_C_XPROT	0x11
+-#define HVM_GE_C_XUSER	0x14
++#define HVM_GE_C_XUSER	0x12
+ #define HVM_GE_C_INVI	0x15
+ #define HVM_GE_C_PRIVI	0x1B
+ #define HVM_GE_C_XMAL	0x1C
+diff --git a/arch/hexagon/include/asm/irq.h b/arch/hexagon/include/asm/irq.h
+index 51661db..1772ad3 100644
+--- a/arch/hexagon/include/asm/irq.h
++++ b/arch/hexagon/include/asm/irq.h
+@@ -19,8 +19,8 @@
+ #ifndef _ASM_IRQ_H_
+ #define _ASM_IRQ_H_
+ 
+-/* Number of first-level interrupts associated with the CPU core. */
+-#define HEXAGON_CPUINTS 32
++/* Hypervisor flattened interrupts -- 32 per-cpu and 128 shared. */
++#define HEXAGON_CPUINTS 160
+ 
+ /*
+  * Must define NR_IRQS before including <asm-generic/irq.h>
+diff --git a/arch/hexagon/include/asm/mmu_context.h b/arch/hexagon/include/asm/mmu_context.h
+index d423d2e..dc9b716 100644
+--- a/arch/hexagon/include/asm/mmu_context.h
++++ b/arch/hexagon/include/asm/mmu_context.h
+@@ -1,7 +1,7 @@
+ /*
+  * MM context support for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012,2015 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -79,7 +79,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ 		next->context.generation = prev->context.generation;
+ 	}
+ 
+-	__vmnewmap((void *)next->context.ptbase);
++	__vmnewmap((void *)next->context.ptbase, VM_TRANS_TYPE_TABLE,
++		   VM_TLB_INVALIDATE_TRUE);
+ }
+ 
+ /*
+diff --git a/arch/hexagon/kernel/head.S b/arch/hexagon/kernel/head.S
+index 320dfc5..9f0977b 100644
+--- a/arch/hexagon/kernel/head.S
++++ b/arch/hexagon/kernel/head.S
+@@ -1,7 +1,7 @@
+ /*
+  * Early kernel startup code for Hexagon
+  *
+- * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
+  *
+  *
+  * This program is free software; you can redistribute it and/or modify
+@@ -124,6 +124,22 @@ ENTRY(stext)
+ 	memw(r0 ++ #4) = r1;
+ 	{ r1 = add(r1,r2); } :endloop0
+ 
++	/*  Hopefully we don't need this any earlier than here  */
++	r0.l = #LO(0x00000800);
++	r0.h = #HI(0x00000800);
++	call	__vmversion;
++
++	{
++		r1.l = #LO(PAGE_OFFSET);
++		r2.l = #LO(vmversion);
++	}
++	{
++		r1.h = #HI(PAGE_OFFSET);
++		r2.h = #HI(vmversion);
++	}
++	r1 = sub(r2,r1);  /*  &vmversion - PAGE_OFFSET  */
++	r1 = add(r1,r25); /*  + PHYS_OFFSET */
++
+ 	r0 = r24;
+ 
+ 	/*
+@@ -133,6 +149,7 @@ ENTRY(stext)
+ 	 * vm_ops.S
+ 	 */
+ 	r1 = #VM_TRANS_TYPE_TABLE
++	r2 = #VM_TLB_INVALIDATE_TRUE
+ 	call	__vmnewmap;
+ 
+ 	/*  Jump into virtual address range.  */
+@@ -161,7 +178,6 @@ __head_s_vaddr_target:
+ 	r2 = asl(r2, #2)	/* times sizeof(PTE) (4bytes)	*/
+ 	r1 = add(r1,r2);
+ 	loop0(1f,r26)
+-
+ 1:
+ 	{
+ 		memw(R1 ++ #4) = R0
+@@ -169,6 +185,7 @@ __head_s_vaddr_target:
+ 
+ 	r0 = r24
+ 	r1 = #VM_TRANS_TYPE_TABLE
++	r2 = #VM_TLB_INVALIDATE_TRUE
+ 	call __vmnewmap
+ 
+ 	/*  Go ahead and install the trap0 return so angel calls work  */
+diff --git a/arch/hexagon/kernel/reset.c b/arch/hexagon/kernel/reset.c
+index 76483c1..50682cd 100644
+--- a/arch/hexagon/kernel/reset.c
++++ b/arch/hexagon/kernel/reset.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012,2015, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -17,20 +17,27 @@
+  */
+ 
+ #include <linux/smp.h>
++#include <linux/irqflags.h>
+ #include <asm/hexagon_vm.h>
+ 
++static inline void __do_vmstop(void *info)
++{
++	__vmstop((long)info);
++}
++
+ void machine_power_off(void)
+ {
+-	smp_send_stop();
+-	__vmstop();
++	on_each_cpu(__do_vmstop, (void *)hvmstop_poweroff, 0);
+ }
+ 
+ void machine_halt(void)
+ {
++	on_each_cpu(__do_vmstop, (void *)hvmstop_halt, 0);
+ }
+ 
+ void machine_restart(char *cmd)
+ {
++	on_each_cpu(__do_vmstop, (void *)hvmstop_restart, 0);
+ }
+ 
+ void (*pm_power_off)(void) = NULL;
+diff --git a/arch/hexagon/kernel/setup.c b/arch/hexagon/kernel/setup.c
+index 6863490..8923240 100644
+--- a/arch/hexagon/kernel/setup.c
++++ b/arch/hexagon/kernel/setup.c
+@@ -36,6 +36,8 @@
+ #include <asm/prom.h>
+ #include <asm/time.h>
+ 
++unsigned long vmversion;
++
+ char cmd_line[COMMAND_LINE_SIZE];
+ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+ 
+@@ -63,13 +65,16 @@ void __init setup_arch(char **cmdline_p)
+ 	pcycle_freq_mhz = 600;
+ 	thread_freq_mhz = 100;
+ 	sleep_clk_freq = 32000;
++	hvm_timer_freq = (cycles_t)__vmtimerop(getfreq, 0, 0);
+ 
+ 	/*
+ 	 * Set up event bindings to handle exceptions and interrupts.
+ 	 */
+ 	__vmsetvec(_K_VM_event_vector);
+ 
+-	printk(KERN_INFO "PHYS_OFFSET=0x%08x\n", PHYS_OFFSET);
++	pr_info("PHYS_OFFSET=0x%08lx\n", PHYS_OFFSET);
++	pr_info("vmversion=0x%08lx\n", vmversion);
++
+ 	/*  initial machine setup from flattened device tree  */
+ 	mdesc = setup_machine_fdt(dtb);
+ 
+diff --git a/arch/hexagon/kernel/smp.c b/arch/hexagon/kernel/smp.c
+index ff759f2..980deb4 100644
+--- a/arch/hexagon/kernel/smp.c
++++ b/arch/hexagon/kernel/smp.c
+@@ -35,6 +35,9 @@
+ 
+ #define BASE_IPI_IRQ 26
+ 
++/*  Virtual Processor ID storage  */
++DEFINE_PER_CPU(u32, vpid);
++
+ /*
+  * cpu_possible_mask needs to be filled out prior to setup_per_cpu_areas
+  * (which is prior to any of our smp_prepare_cpu crap), in order to set
+@@ -68,7 +71,7 @@ static inline void __handle_ipi(unsigned long *ops, struct ipi_data *ipi,
+ 			/*
+ 			 * call vmstop()
+ 			 */
+-			__vmstop();
++			__vmstop(hvmstop_none);
+ 			break;
+ 
+ 		case IPI_RESCHEDULE:
+@@ -115,7 +118,9 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
+ 
+ 		set_bit(msg, &ipi->bits);
+ 		/*  Possible barrier here  */
+-		retval = __vmintop_post(BASE_IPI_IRQ+cpu);
++
++		/*  VPID's don't change  */
++		retval = __vmintop_post(BASE_IPI_IRQ+cpu, per_cpu(vpid, cpu));
+ 
+ 		if (retval != 0) {
+ 			printk(KERN_ERR "interrupt %ld not configured?\n",
+@@ -161,6 +166,10 @@ void start_secondary(void)
+ 		: "r" (thread_ptr)
+ 	);
+ 
++	cpu = smp_processor_id();
++
++	per_cpu(vpid, cpu) = __vmvpid();
++
+ 	/*  Set the memory struct  */
+ 	atomic_inc(&init_mm.mm_count);
+ 	current->active_mm = &init_mm;
+@@ -199,7 +208,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 
+ 	/*  Boot to the head.  */
+ 	stack_start =  ((void *) thread) + THREAD_SIZE;
+-	__vmstart(start_secondary, stack_start);
++	__vmstart(start_secondary, stack_start, 0);
+ 
+ 	while (!cpu_online(cpu))
+ 		barrier();
+@@ -227,6 +236,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	/*  Also need to register the interrupts for IPI  */
+ 	if (max_cpus > 1)
+ 		setup_irq(BASE_IPI_IRQ, &ipi_intdesc);
++
++	per_cpu(vpid, smp_processor_id()) = __vmvpid();
++
+ }
+ 
+ void smp_send_reschedule(int cpu)
+diff --git a/arch/hexagon/kernel/traps.c b/arch/hexagon/kernel/traps.c
+index 110dab1..408de06 100644
+--- a/arch/hexagon/kernel/traps.c
++++ b/arch/hexagon/kernel/traps.c
+@@ -441,7 +441,7 @@ void do_trap0(struct pt_regs *regs)
+ void do_machcheck(struct pt_regs *regs)
+ {
+ 	/* Halt and catch fire */
+-	__vmstop();
++	__vmstop(hvmstop_machinecheck);
+ }
+ 
+ /*
+diff --git a/arch/hexagon/kernel/vm_ops.S b/arch/hexagon/kernel/vm_ops.S
+index 9fb77b3..f041b0a 100644
+--- a/arch/hexagon/kernel/vm_ops.S
++++ b/arch/hexagon/kernel/vm_ops.S
+@@ -30,6 +30,10 @@
+  * consistent with the ABI calling convention.
+  */
+ 
++ENTRY(__vmversion)
++	trap1(#HVM_TRAP1_VMVERSION);
++	jumpr	R31;
++
+ ENTRY(__vmrte)
+ 	trap1(#HVM_TRAP1_VMRTE);
+ 	jumpr	R31;
+@@ -55,7 +59,6 @@ ENTRY(__vmclrmap)
+ 	jumpr	R31;
+ 
+ ENTRY(__vmnewmap)
+-	r1 = #VM_NEWMAP_TYPE_PGTABLES;
+ 	trap1(#HVM_TRAP1_VMNEWMAP);
+ 	jumpr	R31;
+ 
+@@ -100,3 +103,7 @@ ENTRY(__vmsetregs)
+ ENTRY(__vmgetregs)
+ 	trap1(#HVM_TRAP1_VMGETREGS);
+ 	jumpr	R31;
++
++ENTRY(__vmtimerop)
++	trap1(#HVM_TRAP1_VMTIMEROP);
++	jumpr	R31;
+diff --git a/arch/hexagon/mm/vm_tlb.c b/arch/hexagon/mm/vm_tlb.c
+index 9647d00..2aa19ec 100644
+--- a/arch/hexagon/mm/vm_tlb.c
++++ b/arch/hexagon/mm/vm_tlb.c
+@@ -1,7 +1,7 @@
+ /*
+  * Hexagon Virtual Machine TLB functions
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -48,7 +48,7 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
+  */
+ void flush_tlb_one(unsigned long vaddr)
+ {
+-	__vmclrmap((void *)vaddr, PAGE_SIZE);
++	__vmclrmap((void *)(vaddr & ~(PAGE_SIZE - 1)), PAGE_SIZE);
+ }
+ 
+ /*
+@@ -80,7 +80,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long vaddr)
+ 	struct mm_struct *mm = vma->vm_mm;
+ 
+ 	if (mm->context.ptbase  == current->active_mm->context.ptbase)
+-		__vmclrmap((void *)vaddr, PAGE_SIZE);
++		__vmclrmap((void *)(vaddr & ~(PAGE_SIZE - 1)), PAGE_SIZE);
+ }
+ 
+ /*
+-- 
+1.8.4.3
+

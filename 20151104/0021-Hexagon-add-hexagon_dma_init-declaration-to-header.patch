@@ -1,0 +1,31 @@
+From e75b1b277860918e7a30084ef987e2c04cce5f0b Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 27 Oct 2015 12:27:32 -0500
+Subject: [PATCH 21/22] Hexagon: add hexagon_dma_init declaration to header
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/dma.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/hexagon/include/asm/dma.h b/arch/hexagon/include/asm/dma.h
+index 9e34ff4..c44fd56 100644
+--- a/arch/hexagon/include/asm/dma.h
++++ b/arch/hexagon/include/asm/dma.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2015, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -26,4 +26,6 @@
+ 
+ extern size_t hexagon_coherent_pool_size;
+ 
++void __init hexagon_dma_init(void);
++
+ #endif
+-- 
+1.8.4.3
+
