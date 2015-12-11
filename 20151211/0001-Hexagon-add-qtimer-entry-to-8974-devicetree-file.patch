@@ -1,0 +1,30 @@
+From b382cfe487f65f228109670e5b73bcf83f218e55 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Thu, 10 Dec 2015 17:21:53 -0600
+Subject: [PATCH 1/2] Hexagon: add qtimer entry to 8974 devicetree file
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/boot/dts/msm8974.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/hexagon/boot/dts/msm8974.dts b/arch/hexagon/boot/dts/msm8974.dts
+index b6b99ba..64b1bfd 100644
+--- a/arch/hexagon/boot/dts/msm8974.dts
++++ b/arch/hexagon/boot/dts/msm8974.dts
+@@ -52,6 +52,12 @@
+ 			interrupts = <12>;
+ 		};
+ 
++		hwtimer@FE2A0000 {
++			compatible="qcom,qtimer";
++			reg = <0xfe2a0000 0x1000>;
++			interrupts = <35>;
++		};
++
+ 		msmgpio: gpio@fd510000 {
+ 			compatible = "qcom,msm-gpio";
+ 			gpio-controller;
+-- 
+1.8.2.1
+
