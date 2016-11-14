@@ -1,0 +1,89 @@
+From 1869f46fece3eba1c9a58514281a9c7e416d78f2 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 18 Oct 2016 16:21:26 -0500
+Subject: [PATCH 8/8] Hexagon: add/update hypervisor exception codes
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/hexagon_vm.h | 10 +++++++++-
+ arch/hexagon/kernel/traps.c           |  9 ++++++++-
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/arch/hexagon/include/asm/hexagon_vm.h b/arch/hexagon/include/asm/hexagon_vm.h
+index 01f7584..08462d3 100644
+--- a/arch/hexagon/include/asm/hexagon_vm.h
++++ b/arch/hexagon/include/asm/hexagon_vm.h
+@@ -1,7 +1,7 @@
+ /*
+  * Declarations for to Hexagon Virtual Machine.
+  *
+- * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2016, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -294,6 +294,7 @@ static inline long __vmintop_clear(long i)
+ #define HVM_GE_C_XPROT	0x11
+ #define HVM_GE_C_XUSER	0x12
+ #define HVM_GE_C_INVI	0x15
++#define HVM_GE_C_COPROC 0x16
+ #define HVM_GE_C_PRIVI	0x1B
+ #define HVM_GE_C_XMAL	0x1C
+ #define HVM_GE_C_WREG	0x1D
+@@ -306,6 +307,13 @@ static inline long __vmintop_clear(long i)
+ #define HVM_GE_C_WUSER	0x25
+ #define HVM_GE_C_CACHE	0x28
+ 
++/* Extended TLB miss cause codes; earlier ones might be deprecated */
++#define HVM_GE_C_TLBMISSX_0		0x60
++#define HVM_GE_C_TLBMISSX_1		0x61
++#define HVM_GE_C_TLBMISSX_ICINVA	0x62
++#define HVM_GE_C_TLBMISSR		0x70
++#define HVM_GE_C_TLBMISSW		0x71
++
+ /*
+  * Cause codes for Machine Check
+  */
+diff --git a/arch/hexagon/kernel/traps.c b/arch/hexagon/kernel/traps.c
+index b01b06c..ca428f1 100644
+--- a/arch/hexagon/kernel/traps.c
++++ b/arch/hexagon/kernel/traps.c
+@@ -1,7 +1,7 @@
+ /*
+  * Kernel traps/events for Hexagon processor
+  *
+- * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2014,2016, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -56,12 +56,17 @@ static const char *ex_name(int ex)
+ 	switch (ex) {
+ 	case HVM_GE_C_XPROT:
+ 	case HVM_GE_C_XUSER:
++	case HVM_GE_C_TLBMISSX_0:
++	case HVM_GE_C_TLBMISSX_1:
++	case HVM_GE_C_TLBMISSX_ICINVA:
+ 		return "Execute protection fault";
+ 	case HVM_GE_C_RPROT:
+ 	case HVM_GE_C_RUSER:
++	case HVM_GE_C_TLBMISSR:
+ 		return "Read protection fault";
+ 	case HVM_GE_C_WPROT:
+ 	case HVM_GE_C_WUSER:
++	case HVM_GE_C_TLBMISSW:
+ 		return "Write protection fault";
+ 	case HVM_GE_C_XMAL:
+ 		return "Misaligned instruction";
+@@ -80,6 +85,8 @@ static const char *ex_name(int ex)
+ 		return "Precise bus error";
+ 	case HVM_GE_C_CACHE:
+ 		return "Cache error";
++	case HVM_GE_C_COPROC:
++		return "Illegal Coproc instruction";
+ 
+ 	case 0xdb:
+ 		return "Debugger trap";
+-- 
+2.7.4
+

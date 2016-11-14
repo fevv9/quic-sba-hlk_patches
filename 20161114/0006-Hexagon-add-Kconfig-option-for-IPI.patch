@@ -1,0 +1,82 @@
+From e6cd9efd2214a9227a3b32cd056567839bae9661 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 18 Oct 2016 15:52:35 -0500
+Subject: [PATCH 6/8] Hexagon: add Kconfig option for IPI
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig      |  8 ++++++++
+ arch/hexagon/kernel/smp.c | 14 +++++++-------
+ 2 files changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 446d294..b5d419a 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -188,6 +188,14 @@ config NR_CPUS
+ 	  This is purely to save memory - each supported CPU adds
+ 	  approximately eight kilobytes to the kernel image.
+ 
++config BASE_IPI_IRQ
++	int "Base IPI IRQ" if SMP
++	default 8
++	---help---
++	  The base IRQ used for IPI calls.  Each CPU increments by one,
++	  although the newer hypervisor API specifies the lower range of
++	  interrupts to be percpu anyways.
++
+ choice
+ 	prompt "Kernel page size"
+ 	default PAGE_SIZE_4KB
+diff --git a/arch/hexagon/kernel/smp.c b/arch/hexagon/kernel/smp.c
+index 91f72c3..6fb386f 100644
+--- a/arch/hexagon/kernel/smp.c
++++ b/arch/hexagon/kernel/smp.c
+@@ -34,7 +34,6 @@
+ #include <asm/time.h>    /*  timer_interrupt  */
+ #include <asm/hexagon_vm.h>
+ 
+-#define BASE_IPI_IRQ 26
+ DEFINE_PER_CPU(u32, ipi_irq);
+ 
+ /*  Virtual Processor ID storage  */
+@@ -122,11 +121,12 @@ void send_ipi(const struct cpumask *cpumask, enum ipi_message_type msg)
+ 		/*  Possible barrier here  */
+ 
+ 		/*  VPID's don't change  */
+-		retval = __vmintop_post(BASE_IPI_IRQ+cpu, per_cpu(vpid, cpu));
++		retval = __vmintop_post(CONFIG_BASE_IPI_IRQ+cpu,
++			per_cpu(vpid, cpu));
+ 
+ 		if (retval != 0) {
+ 			printk(KERN_ERR "interrupt %ld not configured?\n",
+-				BASE_IPI_IRQ+cpu);
++				CONFIG_BASE_IPI_IRQ+cpu);
+ 		}
+ 	}
+ 
+@@ -182,8 +182,8 @@ void start_secondary(void)
+ 	for (irq = 0; irq < HEXAGON_CPUINTS; irq++)
+ 		__vmintop_locdis(irq);
+ 
+-	per_cpu(ipi_irq, cpu) = irq_find_mapping(NULL, BASE_IPI_IRQ+cpu);
+-	__vmintop_globen(BASE_IPI_IRQ+cpu);
++	per_cpu(ipi_irq, cpu) = irq_find_mapping(NULL, CONFIG_BASE_IPI_IRQ+cpu);
++	__vmintop_globen(CONFIG_BASE_IPI_IRQ+cpu);
+ 	setup_irq(per_cpu(ipi_irq, cpu), &ipi_intdesc);
+ 
+ 	/*  Register the clock_event dummy  */
+@@ -247,8 +247,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	/*  Also need to register the interrupts for IPI  */
+ 	if (max_cpus > 1) {
+ 		per_cpu(ipi_irq, cpu) = irq_find_mapping(NULL,
+-			BASE_IPI_IRQ+cpu);
+-		__vmintop_globen(BASE_IPI_IRQ+cpu);
++			CONFIG_BASE_IPI_IRQ+cpu);
++		__vmintop_globen(CONFIG_BASE_IPI_IRQ+cpu);
+ 		setup_irq(per_cpu(ipi_irq, cpu), &ipi_intdesc);
+ 	}
+ 
+-- 
+2.7.4
+

@@ -1,0 +1,281 @@
+From 05763cb6a7d313f6ed20b59aeff0e2db89f7657d Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 18 Oct 2016 15:30:55 -0500
+Subject: [PATCH 5/8] Hexagon: add support files for MSM8996
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig                   |  8 ++++
+ arch/hexagon/Makefile                  |  1 +
+ arch/hexagon/boot/dts/Makefile         |  3 ++
+ arch/hexagon/boot/dts/msm8996.dts      | 58 ++++++++++++++++++++++++++++
+ arch/hexagon/configs/msm8996_defconfig | 69 ++++++++++++++++++++++++++++++++++
+ arch/hexagon/platform/msm8996/Makefile |  1 +
+ arch/hexagon/platform/msm8996/board.c  | 61 ++++++++++++++++++++++++++++++
+ 7 files changed, 201 insertions(+)
+ create mode 100644 arch/hexagon/boot/dts/msm8996.dts
+ create mode 100644 arch/hexagon/configs/msm8996_defconfig
+ create mode 100644 arch/hexagon/platform/msm8996/Makefile
+ create mode 100644 arch/hexagon/platform/msm8996/board.c
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 38c7f22..446d294 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -111,6 +111,14 @@ config HEXAGON_MSM8974
+ 	---help---
+ 	  Enable support for MSM8974 devices.
+ 
++config HEXAGON_MSM8996
++	bool "MSM8996"
++	select HEXAGON_PHYS_OFFSET
++	select HEXAGON_H2_PIC
++	select HAVE_DMA_ATTRS
++	---help---
++	  Support for MSM8996
++
+ config HEXAGON_COMET
+ 	bool "Comet Board"
+ 	---help---
+diff --git a/arch/hexagon/Makefile b/arch/hexagon/Makefile
+index a7a104e..3db140d 100644
+--- a/arch/hexagon/Makefile
++++ b/arch/hexagon/Makefile
+@@ -41,6 +41,7 @@ core-y += arch/hexagon/kernel/ \
+ 	arch/hexagon/lib/
+ 
+ core-$(CONFIG_HEXAGON_MSM8974)	+= arch/hexagon/platform/msm8974/
++core-$(CONFIG_HEXAGON_MSM8996)	+= arch/hexagon/platform/msm8996/
+ 
+ #  Devtree blob targets
+ boot := arch/hexagon/boot
+diff --git a/arch/hexagon/boot/dts/Makefile b/arch/hexagon/boot/dts/Makefile
+index 56118d7..ecca56f 100644
+--- a/arch/hexagon/boot/dts/Makefile
++++ b/arch/hexagon/boot/dts/Makefile
+@@ -4,6 +4,9 @@ dtb-${CONFIG_HEXAGON_MSM8974}	+= msm8974.dtb
+ obj-${CONFIG_HEXAGON_MSM8974}	+= msm8974.dtb.o
+ endif
+ 
++dtb-${CONFIG_HEXAGON_MSM8996}	+= msm8996.dtb
++obj-${CONFIG_HEXAGON_MSM8996}	+= msm8996.dtb.o
++
+ targets += dtbs
+ targets += $(dtb-y)
+ 
+diff --git a/arch/hexagon/boot/dts/msm8996.dts b/arch/hexagon/boot/dts/msm8996.dts
+new file mode 100644
+index 0000000..ebe68d1
+--- /dev/null
++++ b/arch/hexagon/boot/dts/msm8996.dts
+@@ -0,0 +1,58 @@
++/*
++ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	chosen { };
++	aliases {
++	};
++	memory { device_type = "memory"; reg = <0 0>; };
++
++};
++
++
++/ {
++	chosen {
++		bootargs = "";
++	};
++};
++
++
++/ {
++	model = "Qualcomm Technologies, Inc. MSM8996";
++	compatible = "qcom,msm8996";
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		interrupt-parent = <&PIC0>;
++
++		PIC0: interrupt-controller@0 {
++			compatible = "qcom,h2-pic";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpt@AB000000 {
++			compatible="qcom,h2-timer";
++			reg = <0xab000000 0x1000>;
++			interrupts = <12 0>;
++		};
++
++
++	};
++};
+diff --git a/arch/hexagon/configs/msm8996_defconfig b/arch/hexagon/configs/msm8996_defconfig
+new file mode 100644
+index 0000000..511e60f
+--- /dev/null
++++ b/arch/hexagon/configs/msm8996_defconfig
+@@ -0,0 +1,69 @@
++CONFIG_HEXAGON_MSM8996=y
++CONFIG_HEXAGON_LLVM=y
++CONFIG_USE_OF=y
++CONFIG_CMDLINE="maxcpus=4 debug mem=40M console=hvc0"
++CONFIG_SMP=y
++CONFIG_NR_CPUS=4
++# CONFIG_COMPACTION is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=0
++CONFIG_HZ_100=y
++CONFIG_CROSS_COMPILE="hexagon-"
++CONFIG_LOCALVERSION="-smp"
++# CONFIG_LOCALVERSION_AUTO is not set
++# CONFIG_SWAP is not set
++# CONFIG_CROSS_MEMORY_ATTACH is not set
++# CONFIG_USELIB is not set
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=18
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE="initramfs.cpio.gz"
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++# CONFIG_RD_XZ is not set
++# CONFIG_RD_LZO is not set
++# CONFIG_RD_LZ4 is not set
++# CONFIG_KALLSYMS is not set
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++CONFIG_SLOB=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_STANDALONE is not set
++CONFIG_BLK_DEV_LOOP=y
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_CONSOLE_TRANSLATIONS is not set
++CONFIG_LEGACY_PTY_COUNT=64
++# CONFIG_DEVKMEM is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_VGA_CONSOLE is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_PROC_KCORE=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++# CONFIG_MISC_FILESYSTEMS is not set
++# CONFIG_COREDUMP is not set
++CONFIG_CRYPTO_MD5=y
++CONFIG_CRYPTO_AES=y
++# CONFIG_CRYPTO_HW is not set
++CONFIG_CRC_CCITT=y
++CONFIG_CRC16=y
++CONFIG_CRC_T10DIF=y
++CONFIG_LIBCRC32C=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_FRAME_WARN=0
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
+diff --git a/arch/hexagon/platform/msm8996/Makefile b/arch/hexagon/platform/msm8996/Makefile
+new file mode 100644
+index 0000000..dcfc293
+--- /dev/null
++++ b/arch/hexagon/platform/msm8996/Makefile
+@@ -0,0 +1 @@
++obj-y += board.o
+diff --git a/arch/hexagon/platform/msm8996/board.c b/arch/hexagon/platform/msm8996/board.c
+new file mode 100644
+index 0000000..e7557f7
+--- /dev/null
++++ b/arch/hexagon/platform/msm8996/board.c
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <asm/irq.h>
++#include <asm/hexagon_vm.h>
++#include <asm/platform.h>
++
++static const char *msm8996_dt_compat[] __initconst = {
++	"qcom,msm8996",
++	NULL
++};
++
++static struct platform_device *devices[] __initdata = {
++};
++
++const struct of_device_id platform_of_irq_matches[] __initconst  = {
++	{ .compatible = "qcom,h2-pic", .data = hexagon_pic_of_init, },
++	{},
++};
++
++
++static int __init msm8996_init(void)
++{
++	if (strcmp(mdesc->name, "msm8996"))
++		return 0;
++
++	platform_add_devices(devices, ARRAY_SIZE(devices));
++
++	of_platform_populate(of_find_node_by_path("/soc"),
++		of_default_bus_match_table, NULL, NULL);
++
++	return 0;
++}
++arch_initcall(msm8996_init);
++
++void setup_arch_msm8996(void)
++{
++	bootmem_lastpg = PFN_DOWN(1<<26);
++
++}
++
++MACHINE_START(MSM8996, "msm8996")
++	.setup_arch_machine = setup_arch_msm8996,
++	.dt_compat = msm8996_dt_compat
++MACHINE_END
+-- 
+2.7.4
+

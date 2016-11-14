@@ -1,0 +1,72 @@
+From 26ba98d20af4b0fd85b821858013ffefd1b63de4 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Wed, 12 Oct 2016 14:04:30 -0500
+Subject: [PATCH 1/8] Hexagon: add additional architecture versions
+
+Add additional architecture versions to elf arch flags and
+Kconfig
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/Kconfig           |  5 +++--
+ arch/hexagon/include/asm/elf.h | 21 ++++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 3 deletions(-)
+
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 82c1902..ef32a8b 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -119,8 +119,9 @@ config HEXAGON_COMET
+ endchoice
+ 
+ config HEXAGON_ARCH_VERSION
+-	int "Architecture version"
+-	default 2
++	int "Architecture version (1 - 65)"
++	range 1 65
++	default 60
+ 
+ config HEXAGON_FORCE_USR
+ 	bool "Force USR bit at start of process"
+diff --git a/arch/hexagon/include/asm/elf.h b/arch/hexagon/include/asm/elf.h
+index 9d307d8..74c6e31 100644
+--- a/arch/hexagon/include/asm/elf.h
++++ b/arch/hexagon/include/asm/elf.h
+@@ -1,7 +1,7 @@
+ /*
+  * ELF definitions for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2013,2016, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -193,6 +193,25 @@ do {					\
+ #define ELF_CORE_EFLAGS 0x4
+ #endif
+ 
++#if CONFIG_HEXAGON_ARCH_VERSION == 55
++#define ELF_CORE_EFLAGS 0x5
++#endif
++
++#if CONFIG_HEXAGON_ARCH_VERSION == 60
++#define ELF_CORE_EFLAGS 0x60
++#endif
++
++#if CONFIG_HEXAGON_ARCH_VERSION == 61
++#define ELF_CORE_EFLAGS 0x61
++#endif
++
++#if CONFIG_HEXAGON_ARCH_VERSION == 62
++#define ELF_CORE_EFLAGS 0x62
++#endif
++
++#if CONFIG_HEXAGON_ARCH_VERSION == 65
++#define ELF_CORE_EFLAGS 0x65
++#endif
+ 
+ /*
+  * Some architectures have ld.so set up a pointer to a function
+-- 
+2.7.4
+

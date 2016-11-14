@@ -1,0 +1,144 @@
+From 707bc7cef88fa8138a617ab5f38c346dada53dfc Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 17 Oct 2016 19:09:30 -0500
+Subject: [PATCH 2/8] Hexagon: add workarounds for compiling with LLVM
+
+Added a Kconfig to select LLVM workarounds.
+
+Certain flags in the main makefile won't work.
+
+LLVM generates a call to abort (which doesn't exist) when it detects a null
+pointer dereference.
+
+LLVM doesn't support global registers.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ Makefile                               |  6 ++++++
+ arch/hexagon/Kconfig                   |  6 ++++++
+ arch/hexagon/include/asm/thread_info.h | 12 +++++++++---
+ arch/hexagon/kernel/stacktrace.c       |  6 ++----
+ drivers/tty/sysrq.c                    |  2 +-
+ 5 files changed, 24 insertions(+), 8 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index c361593..b9617d9 100644
+--- a/Makefile
++++ b/Makefile
+@@ -604,7 +604,11 @@ ARCH_AFLAGS :=
+ ARCH_CFLAGS :=
+ include arch/$(SRCARCH)/Makefile
+ 
++ifdef CONFIG_HEXAGON_LLVM
++KBUILD_CFLAGS	+= -Wno-gnu-folding-constant
++else
+ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
++endif
+ 
+ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+ KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+@@ -714,8 +718,10 @@ KBUILD_CFLAGS   += $(call cc-option, -gsplit-dwarf, -g)
+ else
+ KBUILD_CFLAGS	+= -g
+ endif
++ifndef CONFIG_HEXAGON_LLVM
+ KBUILD_AFLAGS	+= -Wa,-gdwarf-2
+ endif
++endif
+ ifdef CONFIG_DEBUG_INFO_DWARF4
+ KBUILD_CFLAGS	+= $(call cc-option, -gdwarf-4,)
+ endif
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index ef32a8b..38c7f22 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -118,6 +118,12 @@ config HEXAGON_COMET
+ 
+ endchoice
+ 
++config HEXAGON_LLVM
++	bool "LLVM"
++	default n
++	---help---
++	  Switch to adjust compilation flags for LLVM
++
+ config HEXAGON_ARCH_VERSION
+ 	int "Architecture version (1 - 65)"
+ 	range 1 65
+diff --git a/arch/hexagon/include/asm/thread_info.h b/arch/hexagon/include/asm/thread_info.h
+index 3b41200..11c972f 100644
+--- a/arch/hexagon/include/asm/thread_info.h
++++ b/arch/hexagon/include/asm/thread_info.h
+@@ -1,7 +1,7 @@
+ /*
+  * Thread support for the Hexagon architecture
+  *
+- * Copyright (c) 2010-2011,2013-2014, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2013-2016, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -92,8 +92,14 @@ struct thread_info {
+ #define qstr(s) #s
+ #define QUOTED_THREADINFO_REG qqstr(THREADINFO_REG)
+ 
+-register struct thread_info *__current_thread_info asm(QUOTED_THREADINFO_REG);
+-#define current_thread_info()  __current_thread_info
++static inline struct thread_info *current_thread_info(void)
++{
++	struct thread_info *x;
++
++	asm("%0 = " QUOTED_THREADINFO_REG : "=r"(x));
++
++	return x;
++}
+ 
+ #endif /* __ASSEMBLY__ */
+ 
+diff --git a/arch/hexagon/kernel/stacktrace.c b/arch/hexagon/kernel/stacktrace.c
+index f94918b..6796232 100644
+--- a/arch/hexagon/kernel/stacktrace.c
++++ b/arch/hexagon/kernel/stacktrace.c
+@@ -1,7 +1,7 @@
+ /*
+  * Stacktrace support for Hexagon
+  *
+- * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2015-2016 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -23,8 +23,6 @@
+ #include <linux/thread_info.h>
+ #include <linux/module.h>
+ 
+-register unsigned long current_frame_pointer asm("r30");
+-
+ struct stackframe {
+ 	unsigned long fp;
+ 	unsigned long rets;
+@@ -42,7 +40,7 @@ void save_stack_trace(struct stack_trace *trace)
+ 
+ 	low = (unsigned long)task_stack_page(current);
+ 	high = low + THREAD_SIZE;
+-	fp = current_frame_pointer;
++	fp = (unsigned long)__builtin_frame_address(0);
+ 
+ 	while (fp >= low && fp <= (high - sizeof(*frame))) {
+ 		frame = (struct stackframe *)fp;
+diff --git a/drivers/tty/sysrq.c b/drivers/tty/sysrq.c
+index b5b4278..b8f8427 100644
+--- a/drivers/tty/sysrq.c
++++ b/drivers/tty/sysrq.c
+@@ -131,7 +131,7 @@ static struct sysrq_key_op sysrq_unraw_op = {
+ 
+ static void sysrq_handle_crash(int key)
+ {
+-	char *killer = NULL;
++	volatile char *killer = NULL;
+ 
+ 	panic_on_oops = 1;	/* force panic */
+ 	wmb();
+-- 
+2.7.4
+

@@ -1,0 +1,33 @@
+From 6e0b57b9ece0cb8599e20390dbe50d6f99c0325f Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Mon, 17 Oct 2016 19:47:36 -0500
+Subject: [PATCH 4/8] Hexagon: add call to free_initmem_default
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/mm/init.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/hexagon/mm/init.c b/arch/hexagon/mm/init.c
+index 00bd5de..b9e964c 100644
+--- a/arch/hexagon/mm/init.c
++++ b/arch/hexagon/mm/init.c
+@@ -23,6 +23,7 @@
+ #include <linux/bootmem.h>
+ #include <asm/atomic.h>
+ #include <linux/highmem.h>
++#include <linux/poison.h>
+ #include <asm/tlb.h>
+ #include <asm/sections.h>
+ #include <asm/vm_mmu.h>
+@@ -101,6 +102,7 @@ void __init mem_init(void)
+  */
+ void __init_refok free_initmem(void)
+ {
++	free_initmem_default(POISON_FREE_INITMEM);
+ }
+ 
+ /*
+-- 
+2.7.4
+

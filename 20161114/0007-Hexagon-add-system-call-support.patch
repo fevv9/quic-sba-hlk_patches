@@ -1,0 +1,79 @@
+From 9e27ef3077c3ca57343e811069dab3628c495260 Mon Sep 17 00:00:00 2001
+From: Richard Kuo <rkuo@codeaurora.org>
+Date: Tue, 18 Oct 2016 16:05:45 -0500
+Subject: [PATCH 7/8] Hexagon: add system call support
+
+Enable some systen calls that our libraries use.
+
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/uapi/asm/unistd.h |  8 +++++++-
+ arch/hexagon/kernel/syscall.c          | 22 ++++++++++++++--------
+ 2 files changed, 21 insertions(+), 9 deletions(-)
+
+diff --git a/arch/hexagon/include/uapi/asm/unistd.h b/arch/hexagon/include/uapi/asm/unistd.h
+index 37b14e3..cd53c4d 100644
+--- a/arch/hexagon/include/uapi/asm/unistd.h
++++ b/arch/hexagon/include/uapi/asm/unistd.h
+@@ -1,7 +1,7 @@
+ /*
+  * Syscall support for Hexagon
+  *
+- * Copyright (c) 2010-2011,2014, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2010-2011,2014-2016 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -26,6 +26,12 @@
+  *  See also:  syscalltab.c
+  */
+ 
++#define __ARCH_WANT_SYSCALL_DEPRECATED
++
++#define __ARCH_WANT_SYSCALL_OFF_T
++#define __ARCH_WANT_SYSCALL_NO_AT
++#define __ARCH_WANT_SYSCALL_NO_FLAGS
++
+ #define __ARCH_WANT_SYS_EXECVE
+ #define __ARCH_WANT_SYS_CLONE
+ #define __ARCH_WANT_SYS_VFORK
+diff --git a/arch/hexagon/kernel/syscall.c b/arch/hexagon/kernel/syscall.c
+index 01b0ed0..cfe6256 100644
+--- a/arch/hexagon/kernel/syscall.c
++++ b/arch/hexagon/kernel/syscall.c
+@@ -23,6 +23,20 @@
+ #include <asm/mman.h>
+ #include <asm/registers.h>
+ 
++asmlinkage int sys_mmap(unsigned long addr, size_t len,
++			unsigned long prot, unsigned long flags,
++			unsigned long fd, off_t off)
++{
++	int retval = -EINVAL;
++
++	if (off & ~PAGE_MASK)
++		goto out;
++
++	retval = sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
++out:
++	return retval;
++}
++
+ unsigned long straight_mmap2;
+ 
+ asmlinkage long sys_mmap2(unsigned long addr, size_t len,
+@@ -39,11 +53,3 @@ asmlinkage long sys_mmap2(unsigned long addr, size_t len,
+ 	return ret;
+ }
+ 
+-
+-static int __init use_straight_mmap2(char *str)
+-{
+-	straight_mmap2 = 1;
+-	return 0;
+-}
+-
+-early_param("use_straight_mmap2", use_straight_mmap2);
+-- 
+2.7.4
+
