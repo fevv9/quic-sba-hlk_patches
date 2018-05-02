@@ -1,0 +1,38 @@
+From a57ab96ef9dde231d4d46edba4d5f73720edc16a Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 6 Apr 2018 16:28:22 +0200
+Subject: [PATCH 1/2] hexagon: add memset_io() helper
+
+We already have memcpy_toio(), but not memset_io(), so let's
+add the obvious version to allow building an allmodconfig kernel
+without errors like
+
+drivers/gpu/drm/ttm/ttm_bo_util.c: In function 'ttm_bo_move_memcpy':
+drivers/gpu/drm/ttm/ttm_bo_util.c:390:3: error: implicit declaration of function 'memset_io' [-Werror=implicit-function-declaration]
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+---
+ arch/hexagon/include/asm/io.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
+index 9e8621d..e17262a 100644
+--- a/arch/hexagon/include/asm/io.h
++++ b/arch/hexagon/include/asm/io.h
+@@ -216,6 +216,12 @@ static inline void memcpy_toio(volatile void __iomem *dst, const void *src,
+ 	memcpy((void *) dst, src, count);
+ }
+ 
++static inline void memset_io(volatile void __iomem *addr, int value,
++			     size_t size)
++{
++	memset((void __force *)addr, value, size);
++}
++
+ #define PCI_IO_ADDR	(volatile void __iomem *)
+ 
+ /*
+-- 
+2.7.4
+
